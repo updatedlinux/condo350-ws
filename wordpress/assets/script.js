@@ -13,6 +13,7 @@
      * Inicialización cuando el documento está listo
      */
     $(document).ready(function() {
+        console.log('Condo360 WhatsApp: Inicializando...');
         initializeWhatsAppWidget();
     });
 
@@ -22,12 +23,17 @@
     function initializeWhatsAppWidget() {
         const container = $('.condo360ws-container');
         
+        console.log('Condo360 WhatsApp: Container encontrado:', container.length);
+        
         if (container.length === 0) {
+            console.log('Condo360 WhatsApp: No se encontró el container');
             return;
         }
 
         const autoRefresh = container.data('auto-refresh') === true;
         const refreshIntervalMs = parseInt(container.data('refresh-interval')) || 10000;
+        
+        console.log('Condo360 WhatsApp: Auto refresh:', autoRefresh, 'Interval:', refreshIntervalMs);
 
         // Configurar botón de actualización manual
         $('#condo360ws-refresh-btn').on('click', function() {
@@ -45,10 +51,12 @@
         });
 
         // Actualización inicial
+        console.log('Condo360 WhatsApp: Iniciando actualización inicial...');
         refreshStatus();
 
         // Configurar actualización automática si está habilitada
         if (autoRefresh) {
+            console.log('Condo360 WhatsApp: Iniciando auto refresh...');
             startAutoRefresh(refreshIntervalMs);
         }
 
@@ -67,12 +75,29 @@
      */
     function refreshStatus() {
         if (isRefreshing) {
+            console.log('Condo360 WhatsApp: Ya está refrescando, saltando...');
             return;
         }
 
+        console.log('Condo360 WhatsApp: Iniciando refresh...');
         isRefreshing = true;
         updateLastRefreshTime();
         setLoadingState(true);
+
+        // Verificar que las variables AJAX estén disponibles
+        if (typeof condo360ws_ajax === 'undefined') {
+            console.error('Condo360 WhatsApp: Variables AJAX no disponibles');
+            handleError('Error: Variables AJAX no disponibles');
+            isRefreshing = false;
+            setLoadingState(false);
+            return;
+        }
+
+        console.log('Condo360 WhatsApp: Enviando petición AJAX...', {
+            url: condo360ws_ajax.ajax_url,
+            action: 'condo360ws_get_status',
+            nonce: condo360ws_ajax.nonce
+        });
 
         // Obtener estado actual
         $.ajax({
@@ -83,6 +108,7 @@
                 nonce: condo360ws_ajax.nonce
             },
             success: function(response) {
+                console.log('Condo360 WhatsApp: Respuesta AJAX recibida:', response);
                 if (response.success) {
                     handleStatusUpdate(response.data);
                 } else {
@@ -90,9 +116,11 @@
                 }
             },
             error: function(xhr, status, error) {
+                console.error('Condo360 WhatsApp: Error AJAX:', xhr, status, error);
                 handleError(condo360ws_ajax.strings.error_loading + ': ' + error);
             },
             complete: function() {
+                console.log('Condo360 WhatsApp: Petición AJAX completada');
                 isRefreshing = false;
                 setLoadingState(false);
             }
@@ -103,6 +131,8 @@
      * Maneja la actualización del estado
      */
     function handleStatusUpdate(status) {
+        console.log('Condo360 WhatsApp: Procesando estado:', status);
+        
         const container = $('.condo360ws-container');
         const statusIndicator = $('#condo360ws-status');
         const statusDot = statusIndicator.find('.status-dot');
@@ -118,6 +148,7 @@
 
         if (status.connected) {
             // WhatsApp está conectado
+            console.log('Condo360 WhatsApp: Estado conectado');
             statusDot.removeClass('checking disconnected').addClass('connected');
             statusText.text(condo360ws_ajax.strings.connected);
             connectedContainer.show().addClass('fade-in');
@@ -127,12 +158,14 @@
             
         } else if (status.qrGenerated) {
             // Hay un QR disponible
+            console.log('Condo360 WhatsApp: QR generado, cargando...');
             statusDot.removeClass('connected disconnected').addClass('checking');
             statusText.text(condo360ws_ajax.strings.scan_qr);
             loadQRCode();
             
         } else {
             // No hay conexión ni QR
+            console.log('Condo360 WhatsApp: Sin conexión ni QR');
             statusDot.removeClass('connected checking').addClass('disconnected');
             statusText.text(condo360ws_ajax.strings.disconnected);
             errorContainer.show().addClass('fade-in');
