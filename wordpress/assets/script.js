@@ -155,7 +155,9 @@
                     const qrContainer = $('#condo360ws-qr-container');
                     const qrImage = $('#condo360ws-qr-image');
                     
-                    qrImage.attr('src', response.data.qr);
+                    // El QR viene en base64, necesitamos agregar el prefijo data:image/png;base64,
+                    const qrDataUrl = 'data:image/png;base64,' + response.data.qr;
+                    qrImage.attr('src', qrDataUrl);
                     qrContainer.show().addClass('fade-in');
                     
                     // Verificar si el QR ha expirado
