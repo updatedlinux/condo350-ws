@@ -29,6 +29,9 @@ class Condo360WhatsAppService {
      * Configura el middleware de Express
      */
     setupMiddleware() {
+        // Configurar trust proxy para Nginx Proxy Manager
+        this.app.set('trust proxy', true);
+        
         // Seguridad básica
         this.app.use(helmet());
         
@@ -38,13 +41,19 @@ class Condo360WhatsAppService {
             credentials: true
         }));
 
-        // Rate limiting
+        // Rate limiting con configuración para proxy
         const limiter = rateLimit({
             windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
             max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
             message: {
                 error: 'Demasiadas solicitudes, intenta más tarde',
                 retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+            },
+            standardHeaders: true,
+            legacyHeaders: false,
+            // Configurar para funcionar con proxy
+            keyGenerator: (req) => {
+                return req.ip || req.connection.remoteAddress;
             }
         });
         this.app.use('/api/', limiter);
