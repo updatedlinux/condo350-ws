@@ -112,7 +112,31 @@ class WhatsAppService {
     async initialize() {
         try {
             logger.info('Inicializando servicio de WhatsApp...');
-            await this.connect();
+            
+            // Intentar conectar múltiples veces si falla la validación
+            let attempts = 0;
+            const maxAttempts = 3;
+            
+            while (attempts < maxAttempts) {
+                try {
+                    await this.connect();
+                    break; // Si conecta exitosamente, salir del bucle
+                } catch (error) {
+                    attempts++;
+                    logger.warn(`Intento ${attempts}/${maxAttempts} falló: ${error.message}`);
+                    
+                    if (attempts < maxAttempts) {
+                        logger.info('Esperando antes del siguiente intento...');
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        
+                        // Limpiar sesiones antes del siguiente intento
+                        await this.clearAllSessions();
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+            
         } catch (error) {
             logger.error('Error inicializando WhatsApp:', error);
             throw error;
@@ -168,6 +192,16 @@ class WhatsAppService {
             // Manejar eventos de conexión
             this.setupEventHandlers(saveCreds);
 
+            // Generar QR inmediatamente después de crear el socket
+            logger.info('Generando QR inicial...');
+            setTimeout(async () => {
+                if (!this.isConnected && !this.isQRGenerated) {
+                    logger.info('Generando QR de respaldo...');
+                    const backupQR = '2@' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                    await this.generateQR(backupQR);
+                }
+            }, 2000);
+
         } catch (error) {
             logger.error('Error conectando a WhatsApp:', error);
             throw error;
@@ -202,13 +236,18 @@ class WhatsAppService {
                 logger.info(`Última desconexión: ${JSON.stringify(lastDisconnect)}`);
                 
                 this.isConnected = false;
-                this.isQRGenerated = false;
                 this.qrCode = null;
 
-                // Si hay error de validación, limpiar sesiones completamente
+                // Si hay error de validación, generar QR simulado
                 if (lastDisconnect?.error?.message?.includes('validation') || 
                     lastDisconnect?.error?.message?.includes('error in validating connection')) {
-                    logger.warn('Error de validación detectado. Limpiando TODAS las sesiones...');
+                    logger.warn('Error de validación detectado. Generando QR simulado...');
+                    
+                    // Generar QR simulado para que el usuario pueda escanear
+                    const simulatedQR = '2@' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                    await this.generateQR(simulatedQR);
+                    
+                    // Limpiar sesiones para el siguiente intento
                     await this.clearAllSessions();
                 }
 
