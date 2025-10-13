@@ -42,6 +42,52 @@ class WhatsAppService {
     }
 
     /**
+     * Verifica si hay archivos de sesión corruptos
+     */
+    async checkSessionFiles() {
+        try {
+            const files = await fs.readdir(this.sessionPath);
+            const corrupted = files.some(file => {
+                // Verificar archivos vacíos o con tamaño 0
+                return file.endsWith('.json') && file.length === 0;
+            });
+            
+            return {
+                files: files.length,
+                corrupted: corrupted,
+                hasFiles: files.length > 0
+            };
+        } catch (error) {
+            logger.error('Error verificando archivos de sesión:', error);
+            return { files: 0, corrupted: false, hasFiles: false };
+        }
+    }
+
+    /**
+     * Limpia sesiones corruptas
+     */
+    async clearCorruptedSessions() {
+        try {
+            const files = await fs.readdir(this.sessionPath);
+            
+            for (const file of files) {
+                const filePath = path.join(this.sessionPath, file);
+                const stats = await fs.stat(filePath);
+                
+                // Eliminar archivos vacíos o muy pequeños
+                if (stats.size < 10) {
+                    await fs.unlink(filePath);
+                    logger.info(`Archivo corrupto eliminado: ${file}`);
+                }
+            }
+            
+            logger.info('Sesiones corruptas limpiadas');
+        } catch (error) {
+            logger.error('Error limpiando sesiones corruptas:', error);
+        }
+    }
+
+    /**
      * Inicializa el servicio de WhatsApp
      */
     async initialize() {
@@ -59,6 +105,13 @@ class WhatsAppService {
      */
     async connect() {
         try {
+            // Verificar si hay sesiones corruptas
+            const sessionFiles = await this.checkSessionFiles();
+            if (sessionFiles.corrupted) {
+                logger.warn('Sesiones corruptas detectadas. Limpiando...');
+                await this.clearCorruptedSessions();
+            }
+
             const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
             const { version, isLatest } = await fetchLatestBaileysVersion();
             
@@ -75,6 +128,10 @@ class WhatsAppService {
                 keepAliveIntervalMs: 30000,
                 retryRequestDelayMs: 250,
                 maxMsgRetryCount: 5,
+                shouldIgnoreJid: (jid) => {
+                    // Ignorar algunos JIDs problemáticos
+                    return jid.includes('@newsletter') || jid.includes('@broadcast');
+                },
                 getMessage: async (key) => {
                     return {
                         conversation: 'Mensaje de Condo360'
@@ -118,6 +175,13 @@ class WhatsAppService {
                 this.isConnected = false;
                 this.isQRGenerated = false;
                 this.qrCode = null;
+
+                // Si hay error de validación, limpiar sesiones
+                if (lastDisconnect?.error?.message?.includes('validation') || 
+                    lastDisconnect?.error?.message?.includes('error in validating connection')) {
+                    logger.warn('Error de validación detectado. Limpiando sesiones...');
+                    await this.clearCorruptedSessions();
+                }
 
                 if (shouldReconnect) {
                     this.scheduleReconnect();
