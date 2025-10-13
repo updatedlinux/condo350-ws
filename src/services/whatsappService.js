@@ -135,23 +135,28 @@ class WhatsAppService {
 
             this.sock = makeWASocket({
                 version,
-                printQRInTerminal: true, // Habilitar QR en terminal para debug
                 auth: state,
                 browser: ['Condo360', 'Chrome', '1.0.0'],
                 logger: logger,
-                generateHighQualityLinkPreview: false,
-                connectTimeoutMs: 20000,
-                keepAliveIntervalMs: 5000,
-                retryRequestDelayMs: 500,
+                // Configuración ultra-mínima para evitar errores de validación
+                connectTimeoutMs: 10000,
+                keepAliveIntervalMs: 3000,
+                retryRequestDelayMs: 200,
                 maxMsgRetryCount: 1,
                 markOnlineOnConnect: false,
                 syncFullHistory: false,
                 fireInitQueries: false,
                 shouldSyncHistoryMessage: () => false,
+                // Deshabilitar funciones que pueden causar problemas de validación
+                generateHighQualityLinkPreview: false,
+                linkPreviewImageThumbnailWidth: 0,
+                // Configuración específica para evitar errores de validación
+                defaultQueryTimeoutMs: 5000,
                 shouldIgnoreJid: (jid) => {
                     return jid.includes('@newsletter') || 
                            jid.includes('@broadcast') || 
-                           jid.includes('@status');
+                           jid.includes('@status') ||
+                           jid.includes('@newsletter');
                 },
                 getMessage: async (key) => {
                     return {
