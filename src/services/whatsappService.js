@@ -38,8 +38,7 @@ class WhatsAppService {
                 }),
                 puppeteer: {
                     headless: true,
-                    // Intentar diferentes rutas de Chrome/Chromium
-                    executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome' || '/usr/bin/chromium-browser' || '/usr/bin/chromium',
+                    executablePath: '/usr/lib64/chromium-browser/chromium-browser',
                     args: [
                         '--no-sandbox',
                         '--disable-setuid-sandbox',
