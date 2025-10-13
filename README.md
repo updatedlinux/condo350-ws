@@ -7,6 +7,8 @@ Un servicio completo de Node.js con Baileys para conectar WhatsApp y enviar mens
 - ✅ Conexión a WhatsApp mediante código QR
 - ✅ Persistencia de sesión para evitar reconexiones frecuentes
 - ✅ API REST para obtener QR y enviar mensajes
+- ✅ **NUEVO**: Lista de grupos disponibles después de autenticación
+- ✅ **NUEVO**: Selección visual de grupo de destino desde WordPress
 - ✅ Shortcode de WordPress para mostrar estado y QR
 - ✅ Actualización automática del QR cada 10 segundos
 - ✅ Reconexión automática en caso de desconexión
@@ -146,6 +148,15 @@ Ejemplo completo:
 4. Toca `Vincular un dispositivo`
 5. Escanea el código QR mostrado
 
+### Seleccionar Grupo de Destino
+
+Una vez conectado WhatsApp:
+
+1. Haz clic en **"Cargar Grupos"** para ver todos los grupos disponibles
+2. Selecciona el grupo al que quieres enviar mensajes
+3. Haz clic en **"Configurar como Grupo de Destino"**
+4. El grupo quedará configurado para recibir mensajes automáticamente
+
 ### Enviar mensajes
 
 Una vez conectado, puedes enviar mensajes usando el API:
@@ -203,6 +214,26 @@ Obtiene el código QR para conectar WhatsApp.
   "connected": false,
   "qr": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
   "expiresAt": "2025-01-27T10:31:00.000Z"
+}
+```
+
+### GET /api/groups
+Obtiene todos los grupos disponibles en WhatsApp.
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "120363123456789012@g.us",
+      "subject": "Grupo de Trabajo",
+      "participants": 15,
+      "creation": 1640995200,
+      "description": "Grupo para coordinación de trabajo",
+      "isGroup": true
+    }
+  ]
 }
 ```
 

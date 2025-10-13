@@ -296,6 +296,61 @@ class WhatsAppService {
     }
 
     /**
+     * Obtiene todos los grupos disponibles
+     */
+    async getGroups() {
+        try {
+            if (!this.isConnected || !this.sock) {
+                throw new Error('WhatsApp no está conectado');
+            }
+
+            // Obtener todos los chats
+            const chats = await this.sock.getChats();
+            
+            // Filtrar solo grupos
+            const groups = [];
+            
+            for (const chat of chats) {
+                // Verificar si es un grupo (contiene @g.us)
+                if (chat.id.includes('@g.us')) {
+                    try {
+                        const groupInfo = await this.sock.groupMetadata(chat.id);
+                        groups.push({
+                            id: groupInfo.id,
+                            subject: groupInfo.subject || 'Sin nombre',
+                            participants: groupInfo.participants.length,
+                            creation: groupInfo.creation,
+                            description: groupInfo.desc || '',
+                            isGroup: true
+                        });
+                    } catch (error) {
+                        // Si no se puede obtener metadata, agregar información básica
+                        groups.push({
+                            id: chat.id,
+                            subject: chat.name || 'Grupo sin nombre',
+                            participants: 0,
+                            creation: null,
+                            description: '',
+                            isGroup: true,
+                            error: 'No se pudo obtener información completa'
+                        });
+                    }
+                }
+            }
+
+            // Ordenar por nombre
+            groups.sort((a, b) => a.subject.localeCompare(b.subject));
+
+            logger.info(`Se encontraron ${groups.length} grupos`);
+            return groups;
+
+        } catch (error) {
+            logger.error('Error obteniendo grupos:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Desconecta WhatsApp
      */
     async disconnect() {

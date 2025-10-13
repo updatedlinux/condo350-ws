@@ -183,6 +183,34 @@ class Condo360WhatsAppService {
             }
         });
 
+        // Obtener grupos disponibles
+        this.app.get('/api/groups', async (req, res) => {
+            try {
+                // Verificar conexión
+                if (!this.whatsappService.isConnected()) {
+                    return res.status(503).json({
+                        success: false,
+                        error: 'WhatsApp no está conectado. Escanea el QR primero.'
+                    });
+                }
+
+                // Obtener grupos
+                const groups = await this.whatsappService.getGroups();
+                
+                res.json({
+                    success: true,
+                    data: groups
+                });
+
+            } catch (error) {
+                logger.error('Error obteniendo grupos:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Error obteniendo grupos'
+                });
+            }
+        });
+
         // Configurar grupo de destino
         this.app.post('/api/set-group', async (req, res) => {
             try {

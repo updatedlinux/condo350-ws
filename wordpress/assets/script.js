@@ -34,6 +34,16 @@
             refreshStatus();
         });
 
+        // Configurar botón de cargar grupos
+        $('#condo360ws-load-groups-btn').on('click', function() {
+            loadGroups();
+        });
+
+        // Configurar botón de configurar grupo
+        $('#condo360ws-set-group-btn').on('click', function() {
+            setSelectedGroup();
+        });
+
         // Actualización inicial
         refreshStatus();
 
@@ -274,10 +284,166 @@
         });
     }
 
+    /**
+     * Carga los grupos disponibles
+     */
+    function loadGroups() {
+        const loadBtn = $('#condo360ws-load-groups-btn');
+        const groupsContainer = $('#condo360ws-groups-container');
+        const groupsLoading = $('#condo360ws-groups-loading');
+        const groupsList = $('#condo360ws-groups-list');
+
+        // Mostrar contenedor y loading
+        groupsContainer.show();
+        groupsLoading.show();
+        groupsList.empty();
+        loadBtn.prop('disabled', true).text('Cargando...');
+
+        $.ajax({
+            url: condo360ws_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'condo360ws_get_groups',
+                nonce: condo360ws_ajax.nonce
+            },
+            success: function(response) {
+                groupsLoading.hide();
+                
+                if (response.success && response.data.length > 0) {
+                    displayGroups(response.data);
+                } else {
+                    displayNoGroups();
+                }
+            },
+            error: function(xhr, status, error) {
+                groupsLoading.hide();
+                displayGroupsError('Error cargando grupos: ' + error);
+            },
+            complete: function() {
+                loadBtn.prop('disabled', false).text('Cargar Grupos');
+            }
+        });
+    }
+
+    /**
+     * Muestra la lista de grupos
+     */
+    function displayGroups(groups) {
+        const groupsList = $('#condo360ws-groups-list');
+        
+        groups.forEach(function(group) {
+            const groupItem = $('<div class="group-item" data-group-id="' + group.id + '">')
+                .append(
+                    $('<div class="group-info">')
+                        .append($('<span class="group-name">').text(group.subject))
+                        .append($('<span class="group-details">').text(group.participants + ' participantes'))
+                )
+                .append($('<span class="group-id">').text(group.id));
+
+            groupsList.append(groupItem);
+        });
+
+        // Configurar click en grupos
+        $('.group-item').on('click', function() {
+            selectGroup($(this));
+        });
+    }
+
+    /**
+     * Muestra mensaje cuando no hay grupos
+     */
+    function displayNoGroups() {
+        const groupsList = $('#condo360ws-groups-list');
+        groupsList.html(
+            '<div class="no-groups-message">' +
+                '<span class="icon">📭</span>' +
+                'No se encontraron grupos disponibles'
+            '</div>'
+        );
+    }
+
+    /**
+     * Muestra error al cargar grupos
+     */
+    function displayGroupsError(message) {
+        const groupsList = $('#condo360ws-groups-list');
+        groupsList.html(
+            '<div class="no-groups-message">' +
+                '<span class="icon">⚠️</span>' +
+                message
+            '</div>'
+        );
+    }
+
+    /**
+     * Selecciona un grupo
+     */
+    function selectGroup(groupElement) {
+        // Remover selección anterior
+        $('.group-item').removeClass('selected');
+        
+        // Seleccionar grupo actual
+        groupElement.addClass('selected');
+        
+        // Obtener información del grupo
+        const groupId = groupElement.data('group-id');
+        const groupName = groupElement.find('.group-name').text();
+        
+        // Mostrar información del grupo seleccionado
+        const selectedGroup = $('#condo360ws-selected-group');
+        selectedGroup.find('.group-name').text(groupName);
+        selectedGroup.find('.group-id').text(groupId);
+        selectedGroup.show();
+    }
+
+    /**
+     * Configura el grupo seleccionado como grupo de destino
+     */
+    function setSelectedGroup() {
+        const selectedGroup = $('#condo360ws-selected-group');
+        const groupId = selectedGroup.find('.group-id').text();
+        const setBtn = $('#condo360ws-set-group-btn');
+
+        if (!groupId) {
+            alert('No hay grupo seleccionado');
+            return;
+        }
+
+        setBtn.prop('disabled', true).text('Configurando...');
+
+        $.ajax({
+            url: condo360ws_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'condo360ws_set_group',
+                nonce: condo360ws_ajax.nonce,
+                groupId: groupId
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Grupo configurado correctamente como destino');
+                    // Opcional: recargar la página o actualizar estado
+                    refreshStatus();
+                } else {
+                    alert('Error configurando grupo: ' + (response.data.message || 'Error desconocido'));
+                }
+            },
+            error: function(xhr, status, error) {
+                alert('Error configurando grupo: ' + error);
+            },
+            complete: function() {
+                setBtn.prop('disabled', false).text('Configurar como Grupo de Destino');
+            }
+        });
+    }
+
     // Exponer funciones globalmente para uso externo
     window.condo360ws = {
         refreshStatus: refreshStatus,
         sendMessage: sendMessage,
+        loadGroups: loadGroups,
+        selectGroup: selectGroup,
+        setSelectedGroup: setSelectedGroup,
         startAutoRefresh: startAutoRefresh,
         stopAutoRefresh: stopAutoRefresh
     };

@@ -47,6 +47,15 @@ Agrega en cualquier página de WordPress:
 3. Ve a `Configuración > Dispositivos vinculados`
 4. Escanea el código QR
 
+## Seleccionar Grupo de Destino
+
+Una vez conectado WhatsApp:
+
+1. Haz clic en **"Cargar Grupos"** para ver todos los grupos disponibles
+2. Selecciona el grupo al que quieres enviar mensajes
+3. Haz clic en **"Configurar como Grupo de Destino"**
+4. El grupo quedará configurado para recibir mensajes automáticamente
+
 ## Enviar Mensajes
 
 Una vez conectado, puedes enviar mensajes usando el API:
