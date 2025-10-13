@@ -38,6 +38,8 @@ class WhatsAppService {
                 }),
                 puppeteer: {
                     headless: true,
+                    // Intentar diferentes rutas de Chrome/Chromium
+                    executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome' || '/usr/bin/chromium-browser' || '/usr/bin/chromium',
                     args: [
                         '--no-sandbox',
                         '--disable-setuid-sandbox',
@@ -47,7 +49,12 @@ class WhatsAppService {
                         '--no-zygote',
                         '--disable-gpu',
                         '--disable-web-security',
-                        '--disable-features=VizDisplayCompositor'
+                        '--disable-features=VizDisplayCompositor',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding',
+                        '--single-process',
+                        '--disable-software-rasterizer'
                     ],
                     timeout: 60000
                 },

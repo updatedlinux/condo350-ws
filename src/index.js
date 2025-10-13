@@ -75,7 +75,7 @@ class Condo360WhatsAppService {
                 uptime: process.uptime(),
                 whatsapp: {
                     connected: this.whatsappService.isConnected(),
-                    qrGenerated: this.whatsappService.isQRGenerated()
+                    qrGenerated: this.whatsappService.isQRGenerated
                 }
             });
         });
@@ -85,9 +85,9 @@ class Condo360WhatsAppService {
             try {
                 const status = {
                     connected: this.whatsappService.isConnected(),
-                    qrGenerated: this.whatsappService.isQRGenerated(),
-                    lastConnection: this.whatsappService.getLastConnectionTime(),
-                    groupId: process.env.WHATSAPP_GROUP_ID
+                    qrGenerated: this.whatsappService.isQRGenerated,
+                    groupId: process.env.WHATSAPP_GROUP_ID,
+                    clientInfo: this.whatsappService.getClientInfo()
                 };
                 res.json({ success: true, data: status });
             } catch (error) {
@@ -107,7 +107,7 @@ class Condo360WhatsAppService {
                     });
                 }
 
-                const qrData = await this.whatsappService.getQRCode();
+                const qrData = this.whatsappService.getQRCode();
                 if (!qrData) {
                     return res.status(404).json({
                         success: false,
@@ -166,7 +166,7 @@ class Condo360WhatsAppService {
                 }
 
                 // Enviar mensaje
-                const result = await this.whatsappService.sendMessageToGroup(groupId, message.trim());
+                const result = await this.whatsappService.sendMessage(message.trim(), groupId);
                 
                 // Guardar en base de datos
                 await this.databaseService.logMessage({
@@ -180,6 +180,7 @@ class Condo360WhatsAppService {
                 res.json({
                     success: result.success,
                     messageId: result.messageId,
+                    groupId: result.groupId,
                     error: result.error
                 });
 
@@ -319,7 +320,7 @@ class Condo360WhatsAppService {
      */
     async stop() {
         try {
-            await this.whatsappService.disconnect();
+            await this.whatsappService.destroy();
             await this.databaseService.close();
             logger.info('Servidor detenido correctamente');
         } catch (error) {
