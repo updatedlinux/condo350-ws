@@ -26,6 +26,8 @@ class WhatsAppService {
      */
     setupClient() {
         try {
+            logger.info('Configurando cliente de WhatsApp...');
+            
             // Crear directorio de sesiones si no existe
             this.ensureSessionDirectory();
 
@@ -43,8 +45,11 @@ class WhatsAppService {
                         '--disable-accelerated-2d-canvas',
                         '--no-first-run',
                         '--no-zygote',
-                        '--disable-gpu'
-                    ]
+                        '--disable-gpu',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor'
+                    ],
+                    timeout: 60000
                 },
                 webVersionCache: {
                     type: 'remote',
@@ -56,6 +61,11 @@ class WhatsAppService {
             logger.info('Cliente de WhatsApp configurado correctamente');
         } catch (error) {
             logger.error('Error configurando cliente de WhatsApp:', error);
+            logger.error('Detalles del error de configuración:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
             throw error;
         }
     }
@@ -156,10 +166,22 @@ class WhatsAppService {
     async initialize() {
         try {
             logger.info('Inicializando servicio de WhatsApp con whatsapp-web.js...');
+            
+            // Verificar que el cliente esté configurado
+            if (!this.client) {
+                throw new Error('Cliente de WhatsApp no configurado');
+            }
+            
+            // Inicializar el cliente
             await this.client.initialize();
-            logger.info('Cliente de WhatsApp inicializado');
+            logger.info('Cliente de WhatsApp inicializado correctamente');
         } catch (error) {
             logger.error('Error inicializando WhatsApp:', error);
+            logger.error('Detalles del error:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
             throw error;
         }
     }
