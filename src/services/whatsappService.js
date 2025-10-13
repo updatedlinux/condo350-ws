@@ -71,6 +71,10 @@ class WhatsAppService {
                 browser: ['Condo360', 'Chrome', '1.0.0'],
                 logger: logger,
                 generateHighQualityLinkPreview: true,
+                connectTimeoutMs: 60000,
+                keepAliveIntervalMs: 30000,
+                retryRequestDelayMs: 250,
+                maxMsgRetryCount: 5,
                 getMessage: async (key) => {
                     return {
                         conversation: 'Mensaje de Condo360'
@@ -98,6 +102,8 @@ class WhatsAppService {
         this.sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
 
+            logger.info(`Estado de conexión: ${connection}`);
+
             if (qr) {
                 logger.info('Generando nuevo QR...');
                 await this.generateQR(qr);
@@ -107,6 +113,7 @@ class WhatsAppService {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 
                 logger.info(`Conexión cerrada. Reconectar: ${shouldReconnect}`);
+                logger.info(`Última desconexión: ${JSON.stringify(lastDisconnect)}`);
                 
                 this.isConnected = false;
                 this.isQRGenerated = false;
@@ -132,6 +139,8 @@ class WhatsAppService {
                 if (user) {
                     logger.info(`Conectado como: ${user.name || user.id}`);
                 }
+            } else if (connection === 'connecting') {
+                logger.info('Conectando a WhatsApp...');
             }
         });
 
@@ -141,6 +150,11 @@ class WhatsAppService {
             if (!msg.key.fromMe && m.type === 'notify') {
                 logger.info(`Mensaje recibido de ${msg.key.remoteJid}: ${msg.message?.conversation || 'Multimedia'}`);
             }
+        });
+
+        // Evento de errores
+        this.sock.ev.on('error', (error) => {
+            logger.error('Error en WhatsApp:', error);
         });
     }
 
