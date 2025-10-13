@@ -88,6 +88,25 @@ class WhatsAppService {
     }
 
     /**
+     * Limpia TODAS las sesiones (para evitar errores de validación)
+     */
+    async clearAllSessions() {
+        try {
+            const files = await fs.readdir(this.sessionPath);
+            
+            for (const file of files) {
+                const filePath = path.join(this.sessionPath, file);
+                await fs.unlink(filePath);
+                logger.info(`Sesión eliminada: ${file}`);
+            }
+            
+            logger.info('Todas las sesiones eliminadas para evitar errores de validación');
+        } catch (error) {
+            logger.error('Error limpiando todas las sesiones:', error);
+        }
+    }
+
+    /**
      * Inicializa el servicio de WhatsApp
      */
     async initialize() {
@@ -105,12 +124,9 @@ class WhatsAppService {
      */
     async connect() {
         try {
-            // Verificar si hay sesiones corruptas
-            const sessionFiles = await this.checkSessionFiles();
-            if (sessionFiles.corrupted) {
-                logger.warn('Sesiones corruptas detectadas. Limpiando...');
-                await this.clearCorruptedSessions();
-            }
+            // Limpiar sesiones completamente para forzar nuevo QR
+            logger.info('Limpiando sesiones para forzar generación de QR...');
+            await this.clearAllSessions();
 
             const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
             const { version, isLatest } = await fetchLatestBaileysVersion();
@@ -119,18 +135,23 @@ class WhatsAppService {
 
             this.sock = makeWASocket({
                 version,
-                printQRInTerminal: false,
+                printQRInTerminal: true, // Habilitar QR en terminal para debug
                 auth: state,
                 browser: ['Condo360', 'Chrome', '1.0.0'],
                 logger: logger,
-                generateHighQualityLinkPreview: true,
-                connectTimeoutMs: 60000,
-                keepAliveIntervalMs: 30000,
-                retryRequestDelayMs: 250,
-                maxMsgRetryCount: 5,
+                generateHighQualityLinkPreview: false,
+                connectTimeoutMs: 20000,
+                keepAliveIntervalMs: 5000,
+                retryRequestDelayMs: 500,
+                maxMsgRetryCount: 1,
+                markOnlineOnConnect: false,
+                syncFullHistory: false,
+                fireInitQueries: false,
+                shouldSyncHistoryMessage: () => false,
                 shouldIgnoreJid: (jid) => {
-                    // Ignorar algunos JIDs problemáticos
-                    return jid.includes('@newsletter') || jid.includes('@broadcast');
+                    return jid.includes('@newsletter') || 
+                           jid.includes('@broadcast') || 
+                           jid.includes('@status');
                 },
                 getMessage: async (key) => {
                     return {
@@ -160,10 +181,13 @@ class WhatsAppService {
             const { connection, lastDisconnect, qr } = update;
 
             logger.info(`Estado de conexión: ${connection}`);
+            logger.info(`Update completo: ${JSON.stringify(update)}`);
 
             if (qr) {
-                logger.info('Generando nuevo QR...');
+                logger.info('🎯 QR RECIBIDO - Generando código QR...');
                 await this.generateQR(qr);
+            } else {
+                logger.info('No hay QR en este update');
             }
 
             if (connection === 'close') {
@@ -176,14 +200,15 @@ class WhatsAppService {
                 this.isQRGenerated = false;
                 this.qrCode = null;
 
-                // Si hay error de validación, limpiar sesiones
+                // Si hay error de validación, limpiar sesiones completamente
                 if (lastDisconnect?.error?.message?.includes('validation') || 
                     lastDisconnect?.error?.message?.includes('error in validating connection')) {
-                    logger.warn('Error de validación detectado. Limpiando sesiones...');
-                    await this.clearCorruptedSessions();
+                    logger.warn('Error de validación detectado. Limpiando TODAS las sesiones...');
+                    await this.clearAllSessions();
                 }
 
                 if (shouldReconnect) {
+                    logger.info('Programando reconexión...');
                     this.scheduleReconnect();
                 } else {
                     logger.info('Sesión cerrada. Se requiere nuevo QR.');
