@@ -11,8 +11,8 @@ const logger = require('../utils/logger');
 class WhatsAppService {
     constructor() {
         this.client = null;
-        this.isConnected = false;
-        this.isQRGenerated = false;
+        this._isConnected = false;
+        this._isQRGenerated = false;
         this.qrCode = null;
         this.sessionPath = path.join(__dirname, '../../sessions');
         this.groupId = process.env.WHATSAPP_GROUP_ID || '';
@@ -107,8 +107,8 @@ class WhatsAppService {
         // Cliente listo
         this.client.on('ready', () => {
             logger.info('✅ WhatsApp conectado y listo!');
-            this.isConnected = true;
-            this.isQRGenerated = false;
+            this._isConnected = true;
+            this._isQRGenerated = false;
             this.qrCode = null;
         });
 
@@ -120,14 +120,14 @@ class WhatsAppService {
         // Cliente desconectado
         this.client.on('disconnected', (reason) => {
             logger.warn(`❌ WhatsApp desconectado: ${reason}`);
-            this.isConnected = false;
+            this._isConnected = false;
             this.qrCode = null;
         });
 
         // Error de autenticación
         this.client.on('auth_failure', (msg) => {
             logger.error('❌ Error de autenticación:', msg);
-            this.isConnected = false;
+            this._isConnected = false;
             this.qrCode = null;
         });
 
@@ -158,7 +158,7 @@ class WhatsAppService {
             });
 
             this.qrCode = qrImageBuffer.toString('base64');
-            this.isQRGenerated = true;
+            this._isQRGenerated = true;
             
             logger.info('✅ QR generado exitosamente');
         } catch (error) {
@@ -197,7 +197,14 @@ class WhatsAppService {
      * Verifica si WhatsApp está conectado
      */
     isConnected() {
-        return this.isConnected && this.client && this.client.info;
+        return this._isConnected && this.client && this.client.info;
+    }
+
+    /**
+     * Verifica si el QR está generado
+     */
+    get isQRGenerated() {
+        return this._isQRGenerated;
     }
 
     /**
