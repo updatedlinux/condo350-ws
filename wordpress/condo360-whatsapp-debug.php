@@ -294,10 +294,20 @@ class Condo360WhatsAppPluginDebug {
                     html += '<p style="padding: 15px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #ddd;">Selecciona un grupo para enviar mensajes:</p>';
                     
                     groups.forEach(function(group) {
+                        var isBroadcast = group.id.includes('@broadcast');
+                        var typeLabel = isBroadcast ? '📢 CANAL DE AVISOS' : '👥 GRUPO';
+                        var typeColor = isBroadcast ? '#e74c3c' : '#3498db';
+                        
                         html += '<div class="group-item" data-group-id="' + group.id + '" style="padding: 12px 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.3s;" onmouseover="this.style.background=\'#f9f9f9\'" onmouseout="this.style.background=\'#fff\'">';
-                        html += '<div style="font-weight: bold; color: #333; margin-bottom: 5px;">' + group.subject + '</div>';
+                        html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">';
+                        html += '<div style="font-weight: bold; color: #333;">' + group.subject + '</div>';
+                        html += '<div style="font-size: 10px; color: ' + typeColor + '; background: ' + typeColor + '20; padding: 2px 6px; border-radius: 10px; font-weight: bold;">' + typeLabel + '</div>';
+                        html += '</div>';
                         html += '<div style="font-size: 12px; color: #666; font-family: monospace; background: #f5f5f5; padding: 4px 8px; border-radius: 3px; margin-bottom: 5px;">ID: ' + group.id + '</div>';
                         html += '<div style="font-size: 12px; color: #666;">' + group.participants + ' participantes</div>';
+                        if (group.description && group.description.length > 0) {
+                            html += '<div style="font-size: 11px; color: #888; margin-top: 5px; max-height: 40px; overflow: hidden;">' + group.description.substring(0, 100) + (group.description.length > 100 ? '...' : '') + '</div>';
+                        }
                         html += '</div>';
                     });
                 }

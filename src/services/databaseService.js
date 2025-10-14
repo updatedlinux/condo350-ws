@@ -58,6 +58,7 @@ class DatabaseService {
                 CREATE TABLE IF NOT EXISTS condo360ws_messages (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     group_id VARCHAR(100) NOT NULL,
+                    group_name VARCHAR(255),
                     message TEXT NOT NULL,
                     status ENUM('sent', 'failed', 'pending') DEFAULT 'pending',
                     message_id VARCHAR(100),
@@ -86,12 +87,37 @@ class DatabaseService {
             await this.connection.execute(configTable);
             await this.connection.execute(messagesTable);
             await this.connection.execute(connectionTable);
-
+            
+            // Verificar y agregar columna group_name si no existe
+            await this.addGroupNameColumnIfNotExists();
+            
             logger.info('Tablas de base de datos creadas/verificadas correctamente');
 
         } catch (error) {
             logger.error('Error creando tablas:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Verifica y agrega la columna group_name si no existe
+     */
+    async addGroupNameColumnIfNotExists() {
+        try {
+            // Verificar si la columna group_name existe
+            const [columns] = await this.connection.execute(
+                "SHOW COLUMNS FROM condo360ws_messages LIKE 'group_name'"
+            );
+            
+            if (columns.length === 0) {
+                // Agregar la columna group_name
+                await this.connection.execute(
+                    "ALTER TABLE condo360ws_messages ADD COLUMN group_name VARCHAR(255) AFTER group_id"
+                );
+                logger.info('Columna group_name agregada a condo360ws_messages');
+            }
+        } catch (error) {
+            logger.error('Error verificando/agregando columna group_name:', error);
         }
     }
 
@@ -276,18 +302,28 @@ class DatabaseService {
                 const configuredAt = rows[0].updated_at;
                 
                 // Intentar obtener el nombre del grupo desde los logs de mensajes
-                const [nameRows] = await this.connection.execute(
-                    'SELECT group_name FROM condo360ws_messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
-                    [groupId]
-                );
-                
-                const groupName = nameRows.length > 0 ? nameRows[0].group_name : 'Grupo desconocido';
-                
-                return {
-                    groupId,
-                    groupName,
-                    configuredAt
-                };
+                try {
+                    const [nameRows] = await this.connection.execute(
+                        'SELECT group_name FROM condo360ws_messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
+                        [groupId]
+                    );
+                    
+                    const groupName = nameRows.length > 0 ? nameRows[0].group_name : 'Grupo desconocido';
+                    
+                    return {
+                        groupId,
+                        groupName,
+                        configuredAt
+                    };
+                } catch (nameError) {
+                    // Si no se puede obtener el nombre, usar solo el ID
+                    logger.warn('No se pudo obtener nombre del grupo:', nameError.message);
+                    return {
+                        groupId,
+                        groupName: 'Grupo desconocido',
+                        configuredAt
+                    };
+                }
             }
 
             return null;

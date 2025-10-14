@@ -262,31 +262,16 @@ class WhatsAppService {
 
             for (const chat of chats) {
                 if (chat.isGroup) {
-                    try {
-                        // Intentar obtener información completa del grupo
-                        const groupInfo = await this.client.getGroupInfo(chat.id._serialized);
-                        groups.push({
-                            id: chat.id._serialized,
-                            subject: chat.name || 'Sin nombre',
-                            participants: groupInfo.participants ? groupInfo.participants.length : 0,
-                            creation: groupInfo.creation,
-                            description: groupInfo.description || '',
-                            isGroup: true
-                        });
-                    } catch (error) {
-                        logger.warn(`No se pudo obtener info completa para grupo ${chat.id._serialized}:`, error.message);
-                        
-                        // Usar información básica del chat
-                        groups.push({
-                            id: chat.id._serialized,
-                            subject: chat.name || 'Grupo sin nombre',
-                            participants: chat.participantsCount || 0,
-                            creation: chat.createdAt || null,
-                            description: chat.description || '',
-                            isGroup: true,
-                            error: 'Información básica (getGroupInfo falló)'
-                        });
-                    }
+                    // Usar información básica del chat (getGroupInfo no existe en whatsapp-web.js)
+                    groups.push({
+                        id: chat.id._serialized,
+                        subject: chat.name || 'Grupo sin nombre',
+                        participants: chat.participantsCount || 0,
+                        creation: chat.createdAt || null,
+                        description: chat.description || '',
+                        isGroup: true,
+                        isBroadcast: chat.id._serialized.includes('@broadcast')
+                    });
                 }
             }
 
