@@ -209,7 +209,7 @@ class Condo360WhatsAppPlugin {
                     <?php if ($api_status['connected']): ?>
                         <br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>
                     <?php else: ?>
-                        <br><small style="color: #dc3545;">🔄 Actualización automática activa (desconectado)</small>
+                        <br><small style="color: #dc3545;">🔄 Actualización automática cada 10s (desconectado)</small>
                     <?php endif; ?>
                 </div>
             </div>
@@ -220,11 +220,12 @@ class Condo360WhatsAppPlugin {
             var updateInterval;
             var isConnected = <?php echo $api_status['connected'] ? 'true' : 'false'; ?>;
             var isQRGenerated = <?php echo $api_status['qrGenerated'] ? 'true' : 'false'; ?>;
+            var qrLoaded = false; // Control para evitar recargar QR
             
-            // Función para verificar estado del API
+            // Función para verificar estado del API (optimizada para evitar rate limits)
             function checkAPIStatus() {
-                // Solo verificar si NO está conectado
-                if (isConnected) {
+                // Solo verificar si NO está conectado y NO hay QR cargado
+                if (isConnected || qrLoaded) {
                     return;
                 }
                 
@@ -240,6 +241,7 @@ class Condo360WhatsAppPlugin {
                             // Si cambió el estado de conexión
                             if (newConnected !== isConnected) {
                                 isConnected = newConnected;
+                                qrLoaded = false; // Resetear QR cuando cambia conexión
                                 updateUI();
                                 
                                 if (isConnected) {
@@ -254,13 +256,23 @@ class Condo360WhatsAppPlugin {
                                 updateUI();
                             }
                             
-                            // Actualizar timestamp solo si no está conectado
-                            $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
-                                '<br><small style="color: #dc3545;">🔄 Actualización automática activa (desconectado)</small>');
+                            // Actualizar timestamp y indicador según estado
+                            if (isConnected) {
+                                $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
+                                    '<br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>');
+                            } else {
+                                $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
+                                    '<br><small style="color: #dc3545;">🔄 Actualización automática cada 10s (desconectado)</small>');
+                            }
                         }
                     },
-                    error: function() {
-                        // Silenciar errores de conexión
+                    error: function(xhr) {
+                        // Si hay error de rate limit, aumentar intervalo
+                        if (xhr.status === 429) {
+                            console.log('Rate limit alcanzado, aumentando intervalo de verificación');
+                            clearInterval(updateInterval);
+                            updateInterval = setInterval(checkAPIStatus, 30000); // 30 segundos
+                        }
                     }
                 });
             }
@@ -335,31 +347,44 @@ class Condo360WhatsAppPlugin {
                 $('.status-dot').removeClass('connected').addClass('disconnected');
                 $('.status-text').text('WhatsApp Desconectado');
                 
-                $.ajax({
-                    url: condo360ws_ajax.api_url + '/api/qr',
-                    type: 'GET',
-                    timeout: 10000,
-                    success: function(response) {
-                        if (response.success && response.qr) {
-                            $('.condo360ws-content').html(`
-                                <div class="condo360ws-qr">
-                                    <h4>Conectar WhatsApp</h4>
-                                    <p>Escanea este código QR con WhatsApp para conectar:</p>
-                                    <div class="qr-code-wrapper">
-                                        <img src="data:image/png;base64,${response.qr}" alt="Código QR de WhatsApp" />
+                // Solo cargar QR si no está ya mostrado
+                if (!qrLoaded) {
+                    $.ajax({
+                        url: condo360ws_ajax.api_url + '/api/qr',
+                        type: 'GET',
+                        timeout: 10000,
+                        success: function(response) {
+                            if (response.success && response.qr) {
+                                qrLoaded = true; // Marcar como cargado
+                                $('.condo360ws-content').html(`
+                                    <div class="condo360ws-qr">
+                                        <h4>Conectar WhatsApp</h4>
+                                        <p>Escanea este código QR con WhatsApp para conectar:</p>
+                                        <div class="qr-code-wrapper">
+                                            <img src="data:image/png;base64,${response.qr}" alt="Código QR de WhatsApp" />
+                                        </div>
+                                        <div class="qr-instructions">
+                                            <p><strong>Instrucciones:</strong></p>
+                                            <ol>
+                                                <li>Abre WhatsApp en tu teléfono</li>
+                                                <li>Ve a Configuración > Dispositivos vinculados</li>
+                                                <li>Toca "Vincular un dispositivo"</li>
+                                                <li>Escanea este código QR</li>
+                                            </ol>
+                                        </div>
                                     </div>
-                                    <div class="qr-instructions">
-                                        <p><strong>Instrucciones:</strong></p>
-                                        <ol>
-                                            <li>Abre WhatsApp en tu teléfono</li>
-                                            <li>Ve a Configuración > Dispositivos vinculados</li>
-                                            <li>Toca "Vincular un dispositivo"</li>
-                                            <li>Escanea este código QR</li>
-                                        </ol>
+                                `);
+                            } else {
+                                $('.condo360ws-content').html(`
+                                    <div class="condo360ws-waiting">
+                                        <div class="waiting-icon">⏳</div>
+                                        <h4>Generando QR</h4>
+                                        <p>Esperando código QR...</p>
                                     </div>
-                                </div>
-                            `);
-                        } else {
+                                `);
+                            }
+                        },
+                        error: function() {
                             $('.condo360ws-content').html(`
                                 <div class="condo360ws-waiting">
                                     <div class="waiting-icon">⏳</div>
@@ -368,17 +393,8 @@ class Condo360WhatsAppPlugin {
                                 </div>
                             `);
                         }
-                    },
-                    error: function() {
-                        $('.condo360ws-content').html(`
-                            <div class="condo360ws-waiting">
-                                <div class="waiting-icon">⏳</div>
-                                <h4>Generando QR</h4>
-                                <p>Esperando código QR...</p>
-                            </div>
-                        `);
-                    }
-                });
+                    });
+                }
             }
             
             // Función para cargar grupos
@@ -531,9 +547,10 @@ class Condo360WhatsAppPlugin {
                     success: function(response) {
                         if (response.success) {
                             alert('WhatsApp desconectado correctamente. Se generará un nuevo QR.');
-                            // Marcar como desconectado para reactivar actualización automática
-                            isConnected = false;
-                            isQRGenerated = false;
+                            // Reactivar verificación automática después de desconectar
+                            qrLoaded = false;
+                            clearInterval(updateInterval);
+                            updateInterval = setInterval(checkAPIStatus, 10000);
                         } else {
                             alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }
@@ -565,8 +582,8 @@ class Condo360WhatsAppPlugin {
                 // Configurar eventos iniciales
                 setupEventHandlers();
                 
-                // Iniciar verificación automática cada 3 segundos
-                updateInterval = setInterval(checkAPIStatus, 3000);
+                // Iniciar verificación automática cada 10 segundos (reducido para evitar rate limits)
+                updateInterval = setInterval(checkAPIStatus, 10000);
                 
                 // Cargar grupos automáticamente si WhatsApp está conectado
                 if (isConnected) {
