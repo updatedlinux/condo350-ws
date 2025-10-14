@@ -153,6 +153,9 @@
             statusText.text(condo360ws_ajax.strings.connected);
             connectedContainer.show().addClass('fade-in');
             
+            // Cargar grupos automáticamente cuando está conectado
+            loadGroups();
+            
             // Detener actualización automática cuando está conectado
             stopAutoRefresh();
             
@@ -437,6 +440,7 @@
     function setSelectedGroup() {
         const selectedGroup = $('#condo360ws-selected-group');
         const groupId = selectedGroup.find('.group-id').text();
+        const groupName = selectedGroup.find('.group-name').text();
         const setBtn = $('#condo360ws-set-group-btn');
 
         if (!groupId) {
@@ -450,13 +454,14 @@
             url: condo360ws_ajax.ajax_url,
             type: 'POST',
             data: {
-                action: 'condo360ws_set_group',
+                action: 'condo360ws_set_group_db',
                 nonce: condo360ws_ajax.nonce,
-                groupId: groupId
+                group_id: groupId,
+                group_name: groupName
             },
             success: function(response) {
                 if (response.success) {
-                    alert('Grupo configurado correctamente como destino');
+                    alert('Grupo "' + groupName + '" configurado correctamente como destino.\nID: ' + groupId);
                     // Opcional: recargar la página o actualizar estado
                     refreshStatus();
                 } else {

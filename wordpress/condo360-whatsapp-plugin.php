@@ -35,6 +35,7 @@ class Condo360WhatsAppPlugin {
         add_action('wp_ajax_condo360ws_get_groups', array($this, 'ajax_get_groups'));
         add_action('wp_ajax_condo360ws_set_group', array($this, 'ajax_set_group'));
         add_action('wp_ajax_condo360ws_send_message', array($this, 'ajax_send_message'));
+        add_action('wp_ajax_condo360ws_set_group_db', array($this, 'ajax_set_group_db'));
         
         // Shortcode
         add_shortcode('wa_connect_qr', array($this, 'shortcode_wa_connect_qr'));
@@ -450,6 +451,52 @@ class Condo360WhatsAppPlugin {
             wp_send_json_error(array(
                 'message' => __('Error enviando mensaje', 'condo360ws'),
                 'error' => $data['error'] ?? 'Error desconocido'
+            ));
+        }
+    }
+    
+    /**
+     * AJAX: Guardar grupo seleccionado en base de datos
+     */
+    public function ajax_set_group_db() {
+        check_ajax_referer('condo360ws_nonce', 'nonce');
+        
+        if (!current_user_can('administrator')) {
+            wp_die(__('No tienes permisos para realizar esta acción', 'condo360ws'));
+        }
+        
+        $group_id = sanitize_text_field($_POST['group_id'] ?? '');
+        $group_name = sanitize_text_field($_POST['group_name'] ?? '');
+        
+        if (empty($group_id)) {
+            wp_send_json_error(array(
+                'message' => __('ID de grupo requerido', 'condo360ws')
+            ));
+        }
+        
+        // Guardar en la base de datos
+        global $wpdb;
+        $config_table = $wpdb->prefix . 'condo360ws_config';
+        
+        $result = $wpdb->replace(
+            $config_table,
+            array(
+                'config_key' => 'whatsapp_group_id',
+                'config_value' => $group_id,
+                'updated_at' => current_time('mysql')
+            ),
+            array('%s', '%s', '%s')
+        );
+        
+        if ($result !== false) {
+            wp_send_json_success(array(
+                'message' => __('Grupo seleccionado correctamente', 'condo360ws'),
+                'group_id' => $group_id,
+                'group_name' => $group_name
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => __('Error guardando grupo en base de datos', 'condo360ws')
             ));
         }
     }
