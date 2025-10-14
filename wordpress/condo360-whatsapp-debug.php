@@ -206,6 +206,11 @@ class Condo360WhatsAppPlugin {
                 </button>
                 <div class="last-updated">
                     Última actualización: <?php echo date('H:i:s'); ?>
+                    <?php if ($api_status['connected']): ?>
+                        <br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>
+                    <?php else: ?>
+                        <br><small style="color: #dc3545;">🔄 Actualización automática activa (desconectado)</small>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -218,6 +223,11 @@ class Condo360WhatsAppPlugin {
             
             // Función para verificar estado del API
             function checkAPIStatus() {
+                // Solo verificar si NO está conectado
+                if (isConnected) {
+                    return;
+                }
+                
                 $.ajax({
                     url: condo360ws_ajax.api_url + '/api/status',
                     type: 'GET',
@@ -244,8 +254,9 @@ class Condo360WhatsAppPlugin {
                                 updateUI();
                             }
                             
-                            // Actualizar timestamp
-                            $('.last-updated').text('Última actualización: ' + new Date().toLocaleTimeString());
+                            // Actualizar timestamp solo si no está conectado
+                            $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
+                                '<br><small style="color: #dc3545;">🔄 Actualización automática activa (desconectado)</small>');
                         }
                     },
                     error: function() {
@@ -297,6 +308,10 @@ class Condo360WhatsAppPlugin {
                     
                     // Reconfigurar eventos
                     setupEventHandlers();
+                    
+                    // Actualizar indicador de estado
+                    $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
+                        '<br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>');
                     
                 } else if (isQRGenerated) {
                     // Mostrar QR
@@ -516,7 +531,9 @@ class Condo360WhatsAppPlugin {
                     success: function(response) {
                         if (response.success) {
                             alert('WhatsApp desconectado correctamente. Se generará un nuevo QR.');
-                            // No recargar página - la actualización automática se encargará
+                            // Marcar como desconectado para reactivar actualización automática
+                            isConnected = false;
+                            isQRGenerated = false;
                         } else {
                             alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }
