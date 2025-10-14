@@ -157,20 +157,21 @@ class Condo360WhatsAppService {
                 }
 
                 // Verificar grupo configurado
-                const groupId = process.env.WHATSAPP_GROUP_ID;
-                if (!groupId) {
-                    return res.status(500).json({
+                const configuredGroup = await this.databaseService.getConfiguredGroup();
+                if (!configuredGroup || !configuredGroup.groupId) {
+                    return res.status(400).json({
                         success: false,
                         error: 'Grupo de WhatsApp no configurado'
                     });
                 }
 
                 // Enviar mensaje
-                const result = await this.whatsappService.sendMessage(message.trim(), groupId);
+                const result = await this.whatsappService.sendMessage(message.trim(), configuredGroup.groupId);
                 
                 // Guardar en base de datos
                 await this.databaseService.logMessage({
-                    groupId,
+                    groupId: configuredGroup.groupId,
+                    groupName: configuredGroup.groupName,
                     message: message.trim(),
                     status: result.success ? 'sent' : 'failed',
                     timestamp: new Date(),

@@ -542,6 +542,7 @@ class Condo360WhatsAppPluginDebug {
         
         // Log para depuración
         error_log("Condo360 Debug: Intentando guardar grupo - ID: $group_id, Name: $group_name");
+        error_log("Condo360 Debug: POST data recibida: " . print_r($_POST, true));
         
         if (empty($group_id)) {
             wp_send_json_error(array(
@@ -564,6 +565,9 @@ class Condo360WhatsAppPluginDebug {
         $table_structure = $wpdb->get_results("DESCRIBE $config_table");
         error_log("Condo360 Debug: Estructura de tabla: " . print_r($table_structure, true));
         
+        // Verificar datos antes de insertar
+        error_log("Condo360 Debug: Datos a insertar - config_key: whatsapp_group_id, config_value: $group_id");
+        
         $result = $wpdb->replace(
             $config_table,
             array(
@@ -576,6 +580,7 @@ class Condo360WhatsAppPluginDebug {
         
         error_log("Condo360 Debug: Resultado de replace: " . print_r($result, true));
         error_log("Condo360 Debug: Último error de DB: " . $wpdb->last_error);
+        error_log("Condo360 Debug: Última consulta: " . $wpdb->last_query);
         
         if ($result !== false) {
             // Verificar que se guardó correctamente
