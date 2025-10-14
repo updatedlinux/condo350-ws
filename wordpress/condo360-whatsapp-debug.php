@@ -231,7 +231,17 @@ class Condo360WhatsAppPlugin {
                         if (response.success && response.data.groups) {
                             displayGroups(response.data.groups);
                         } else {
-                            $('#groups-list').html('<p style="color: red;">Error cargando grupos: ' + (response.data || 'Error desconocido') + '</p>').show();
+                            var errorMsg = 'Error desconocido';
+                            if (response.data) {
+                                if (typeof response.data === 'string') {
+                                    errorMsg = response.data;
+                                } else if (response.data.message) {
+                                    errorMsg = response.data.message;
+                                } else if (response.data.error) {
+                                    errorMsg = response.data.error;
+                                }
+                            }
+                            $('#groups-list').html('<p style="color: red;">Error cargando grupos: ' + errorMsg + '</p>').show();
                         }
                     },
                     error: function(xhr, status, error) {
@@ -351,8 +361,11 @@ class Condo360WhatsAppPlugin {
                     },
                     success: function(response) {
                         if (response.success) {
-                            alert('WhatsApp desconectado correctamente');
-                            location.reload();
+                            alert('WhatsApp desconectado correctamente. Se generará un nuevo QR.');
+                            // Recargar después de 3 segundos para mostrar el nuevo QR
+                            setTimeout(function() {
+                                location.reload();
+                            }, 3000);
                         } else {
                             alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }

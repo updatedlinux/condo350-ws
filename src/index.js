@@ -258,6 +258,16 @@ class Condo360WhatsAppService {
                 
                 logger.info('WhatsApp desconectado manualmente');
                 
+                // Reinicializar para generar nuevo QR
+                setTimeout(async () => {
+                    try {
+                        await this.whatsappService.initialize();
+                        logger.info('WhatsApp reinicializado para generar nuevo QR');
+                    } catch (error) {
+                        logger.error('Error reinicializando WhatsApp:', error);
+                    }
+                }, 2000);
+                
                 res.json({
                     success: true,
                     message: 'WhatsApp desconectado correctamente'

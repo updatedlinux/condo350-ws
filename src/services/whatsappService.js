@@ -281,7 +281,7 @@ class WhatsAppService {
             logger.info(`Se encontraron ${groups.length} grupos`);
             return groups;
         } catch (error) {
-            logger.error('Error obteniendo grupos:', error);
+            logger.error('Error obteniendo grupos:', error.message);
             throw error;
         }
     }
