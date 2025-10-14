@@ -124,7 +124,7 @@ class Condo360WhatsAppPlugin {
         ?>
         <div class="condo360ws-container">
             <div class="condo360ws-header">
-                <h3>WhatsApp Condo360</h3>
+                <h3>Conexion Whatsapp Condominio360</h3>
                 <div class="condo360ws-status-indicator" id="condo360ws-status">
                     <span class="status-dot <?php echo $api_status['connected'] ? 'connected' : 'disconnected'; ?>"></span>
                     <span class="status-text">
