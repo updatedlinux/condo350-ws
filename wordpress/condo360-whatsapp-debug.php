@@ -362,10 +362,10 @@ class Condo360WhatsAppPlugin {
                     success: function(response) {
                         if (response.success) {
                             alert('WhatsApp desconectado correctamente. Se generará un nuevo QR.');
-                            // Recargar después de 3 segundos para mostrar el nuevo QR
+                            // Recargar después de 5 segundos para mostrar el nuevo QR
                             setTimeout(function() {
                                 location.reload();
-                            }, 3000);
+                            }, 5000);
                         } else {
                             alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }

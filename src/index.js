@@ -261,12 +261,14 @@ class Condo360WhatsAppService {
                 // Reinicializar para generar nuevo QR
                 setTimeout(async () => {
                     try {
+                        // Crear un nuevo cliente completamente limpio
+                        await this.whatsappService.setupClient();
                         await this.whatsappService.initialize();
                         logger.info('WhatsApp reinicializado para generar nuevo QR');
                     } catch (error) {
                         logger.error('Error reinicializando WhatsApp:', error);
                     }
-                }, 2000);
+                }, 3000);
                 
                 res.json({
                     success: true,

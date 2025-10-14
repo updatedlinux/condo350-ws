@@ -173,9 +173,9 @@ class WhatsAppService {
         try {
             logger.info('Inicializando servicio de WhatsApp con whatsapp-web.js...');
             
-            // Verificar que el cliente esté configurado
+            // Si no hay cliente o fue destruido, crear uno nuevo
             if (!this.client) {
-                throw new Error('Cliente de WhatsApp no configurado');
+                this.setupClient();
             }
             
             // Inicializar el cliente
@@ -329,7 +329,7 @@ class WhatsAppService {
     }
 
     /**
-     * Cierra la conexión de WhatsApp
+     * Cierra la conexión de WhatsApp y limpia la sesión
      */
     async destroy() {
         try {
@@ -337,6 +337,31 @@ class WhatsAppService {
                 await this.client.destroy();
                 logger.info('Cliente de WhatsApp cerrado');
             }
+            
+            // Limpiar estado
+            this._isConnected = false;
+            this._isQRGenerated = false;
+            this.qrCode = null;
+            this.client = null;
+            
+            // Limpiar archivos de sesión
+            const fs = require('fs');
+            const path = require('path');
+            const sessionPath = path.join(__dirname, '../../sessions');
+            
+            if (fs.existsSync(sessionPath)) {
+                const files = fs.readdirSync(sessionPath);
+                for (const file of files) {
+                    const filePath = path.join(sessionPath, file);
+                    try {
+                        fs.unlinkSync(filePath);
+                        logger.info(`Archivo de sesión eliminado: ${file}`);
+                    } catch (err) {
+                        logger.warn(`No se pudo eliminar archivo de sesión: ${file}`);
+                    }
+                }
+            }
+            
         } catch (error) {
             logger.error('Error cerrando cliente:', error);
         }
