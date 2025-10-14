@@ -1,6 +1,6 @@
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const QRCode = require('qrcode');
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
 
@@ -92,7 +92,7 @@ class WhatsAppService {
      */
     async ensureSessionDirectory() {
         try {
-            await fs.mkdir(this.sessionPath, { recursive: true });
+            fs.mkdirSync(this.sessionPath, { recursive: true });
             logger.info(`Directorio de sesiones: ${this.sessionPath}`);
         } catch (error) {
             logger.error('Error creando directorio de sesiones:', error);
@@ -327,10 +327,10 @@ class WhatsAppService {
      */
     async clearSessions() {
         try {
-            const files = await fs.readdir(this.sessionPath);
+            const files = fs.readdirSync(this.sessionPath);
             for (const file of files) {
                 const filePath = path.join(this.sessionPath, file);
-                await fs.unlink(filePath);
+                fs.unlinkSync(filePath);
                 logger.info(`Sesión eliminada: ${file}`);
             }
             logger.info('Todas las sesiones eliminadas');
@@ -344,8 +344,6 @@ class WhatsAppService {
      */
     cleanupOldSessions() {
         try {
-            const fs = require('fs');
-            const path = require('path');
             const sessionsBasePath = path.join(__dirname, '../../sessions');
             
             if (!fs.existsSync(sessionsBasePath)) {
