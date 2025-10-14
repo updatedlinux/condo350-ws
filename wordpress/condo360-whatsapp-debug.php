@@ -280,50 +280,121 @@ class Condo360WhatsAppPlugin {
             // Función para actualizar la UI según el estado
             function updateUI() {
                 if (isConnected) {
-                    // Mostrar estado conectado
-                    $('.status-dot').removeClass('disconnected').addClass('connected');
-                    $('.status-text').text('WhatsApp Conectado');
-                    $('.condo360ws-content').html(`
-                        <div class="condo360ws-connected">
-                            <div class="success-icon">✓</div>
-                            <h4>WhatsApp Conectado</h4>
-                            <p>El servicio de WhatsApp está funcionando correctamente.</p>
+                    // Verificar grupo configurado
+                    $.ajax({
+                        url: condo360ws_ajax.api_url + '/api/configured-group',
+                        type: 'GET',
+                        timeout: 5000,
+                        success: function(response) {
+                            var groupStatus = '';
+                            if (response.success && response.data && response.data.groupId) {
+                                groupStatus = '<div style="margin-top: 10px; padding: 10px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">' +
+                                    '<strong>✅ Grupo configurado:</strong> Ya hay un grupo configurado para el envío de mensajes.' +
+                                    '</div>';
+                            } else {
+                                groupStatus = '<div style="margin-top: 10px; padding: 10px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24;">' +
+                                    '<strong>⚠️ Sin grupo configurado:</strong> No hay ningún grupo configurado para el envío de mensajes.' +
+                                    '</div>';
+                            }
                             
-                            <div id="groups-section" style="margin-top: 20px;">
-                                <h5>Gestión de Grupos</h5>
-                                <button type="button" id="load-groups-btn" class="btn-primary">
-                                    Cargar Grupos
-                                </button>
-                                <div id="groups-loading" class="loading-spinner" style="display: none;">
-                                    <div class="spinner"></div>
-                                    <p>Cargando grupos...</p>
+                            // Mostrar estado conectado con información del grupo
+                            $('.status-dot').removeClass('disconnected').addClass('connected');
+                            $('.status-text').text('WhatsApp Conectado');
+                            $('.condo360ws-content').html(`
+                                <div class="condo360ws-connected">
+                                    <div class="success-icon">✓</div>
+                                    <h4>WhatsApp Conectado</h4>
+                                    <p>El servicio de WhatsApp está funcionando correctamente.</p>
+                                    ${groupStatus}
+                                    
+                                    <div id="groups-section" style="margin-top: 20px;">
+                                        <h5>Gestión de Grupos</h5>
+                                        <button type="button" id="load-groups-btn" class="btn-primary">
+                                            Cargar Grupos
+                                        </button>
+                                        <div id="groups-loading" class="loading-spinner" style="display: none;">
+                                            <div class="spinner"></div>
+                                            <p>Cargando grupos...</p>
+                                        </div>
+                                        <div id="groups-list" style="display: none;">
+                                            <!-- Los grupos se cargarán aquí -->
+                                        </div>
+                                        <div id="selected-group" class="selected-group" style="display: none;">
+                                            <h6>Grupo Seleccionado:</h6>
+                                            <div id="selected-group-info"></div>
+                                            <button type="button" id="set-group-btn" class="btn-success">
+                                                Configurar como Grupo de Destino
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="margin-top: 20px;">
+                                        <button type="button" id="disconnect-btn" class="btn-danger">
+                                            Desconectar WhatsApp
+                                        </button>
+                                    </div>
                                 </div>
-                                <div id="groups-list" style="display: none;">
-                                    <!-- Los grupos se cargarán aquí -->
-                                </div>
-                                <div id="selected-group" class="selected-group" style="display: none;">
-                                    <h6>Grupo Seleccionado:</h6>
-                                    <div id="selected-group-info"></div>
-                                    <button type="button" id="set-group-btn" class="btn-success">
-                                        Configurar como Grupo de Destino
-                                    </button>
-                                </div>
-                            </div>
+                            `);
                             
-                            <div style="margin-top: 20px;">
-                                <button type="button" id="disconnect-btn" class="btn-danger">
-                                    Desconectar WhatsApp
-                                </button>
-                            </div>
-                        </div>
-                    `);
-                    
-                    // Reconfigurar eventos
-                    setupEventHandlers();
-                    
-                    // Actualizar indicador de estado
-                    $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
-                        '<br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>');
+                            // Reconfigurar eventos
+                            setupEventHandlers();
+                            
+                            // Actualizar indicador de estado
+                            $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
+                                '<br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>');
+                        },
+                        error: function() {
+                            // En caso de error, mostrar sin información del grupo
+                            var groupStatus = '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; color: #856404;">' +
+                                '<strong>⚠️ Estado desconocido:</strong> No se pudo verificar el estado del grupo configurado.' +
+                                '</div>';
+                            
+                            $('.status-dot').removeClass('disconnected').addClass('connected');
+                            $('.status-text').text('WhatsApp Conectado');
+                            $('.condo360ws-content').html(`
+                                <div class="condo360ws-connected">
+                                    <div class="success-icon">✓</div>
+                                    <h4>WhatsApp Conectado</h4>
+                                    <p>El servicio de WhatsApp está funcionando correctamente.</p>
+                                    ${groupStatus}
+                                    
+                                    <div id="groups-section" style="margin-top: 20px;">
+                                        <h5>Gestión de Grupos</h5>
+                                        <button type="button" id="load-groups-btn" class="btn-primary">
+                                            Cargar Grupos
+                                        </button>
+                                        <div id="groups-loading" class="loading-spinner" style="display: none;">
+                                            <div class="spinner"></div>
+                                            <p>Cargando grupos...</p>
+                                        </div>
+                                        <div id="groups-list" style="display: none;">
+                                            <!-- Los grupos se cargarán aquí -->
+                                        </div>
+                                        <div id="selected-group" class="selected-group" style="display: none;">
+                                            <h6>Grupo Seleccionado:</h6>
+                                            <div id="selected-group-info"></div>
+                                            <button type="button" id="set-group-btn" class="btn-success">
+                                                Configurar como Grupo de Destino
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="margin-top: 20px;">
+                                        <button type="button" id="disconnect-btn" class="btn-danger">
+                                            Desconectar WhatsApp
+                                        </button>
+                                    </div>
+                                </div>
+                            `);
+                            
+                            // Reconfigurar eventos
+                            setupEventHandlers();
+                            
+                            // Actualizar indicador de estado
+                            $('.last-updated').html('Última actualización: ' + new Date().toLocaleTimeString() + 
+                                '<br><small style="color: #28a745;">✓ Actualización automática deshabilitada (conectado)</small>');
+                        }
+                    });
                     
                 } else if (isQRGenerated) {
                     // Mostrar QR
@@ -551,6 +622,9 @@ class Condo360WhatsAppPlugin {
                             qrLoaded = false;
                             clearInterval(updateInterval);
                             updateInterval = setInterval(checkAPIStatus, 10000);
+                            
+                            // Mostrar tooltip informativo
+                            showDisconnectTooltip();
                         } else {
                             alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }
@@ -560,6 +634,53 @@ class Condo360WhatsAppPlugin {
                     },
                     complete: function() {
                         $('#disconnect-btn').prop('disabled', false).text('Desconectar WhatsApp');
+                    }
+                });
+            }
+            
+            // Función para mostrar tooltip después de desconectar
+            function showDisconnectTooltip() {
+                // Crear tooltip
+                var tooltip = $('<div class="disconnect-tooltip">' +
+                    '<div class="tooltip-content">' +
+                    '<div class="tooltip-icon">💡</div>' +
+                    '<div class="tooltip-text">' +
+                    '<strong>Consejo:</strong><br>' +
+                    'Puedes usar el botón "Actualizar Estado" para obtener un nuevo QR más rápido.' +
+                    '</div>' +
+                    '<button type="button" class="tooltip-close" onclick="$(this).parent().parent().fadeOut()">×</button>' +
+                    '</div>' +
+                    '</div>');
+                
+                // Agregar al footer
+                $('.condo360ws-footer').append(tooltip);
+                
+                // Mostrar con animación
+                tooltip.hide().fadeIn(500);
+                
+                // Auto-ocultar después de 8 segundos
+                setTimeout(function() {
+                    tooltip.fadeOut(500, function() {
+                        $(this).remove();
+                    });
+                }, 8000);
+            }
+            
+            // Función para verificar grupo configurado
+            function checkConfiguredGroup() {
+                $.ajax({
+                    url: condo360ws_ajax.api_url + '/api/configured-group',
+                    type: 'GET',
+                    timeout: 5000,
+                    success: function(response) {
+                        if (response.success && response.data && response.data.groupId) {
+                            return true; // Hay grupo configurado
+                        } else {
+                            return false; // No hay grupo configurado
+                        }
+                    },
+                    error: function() {
+                        return false; // Error, asumir que no hay grupo
                     }
                 });
             }
@@ -781,6 +902,70 @@ class Condo360WhatsAppPlugin {
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        
+        /* Estilos para tooltip de desconexión */
+        .disconnect-tooltip {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 300px;
+            animation: slideInRight 0.5s ease-out;
+        }
+        
+        .tooltip-content {
+            background: #fff;
+            border: 2px solid #007cba;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            position: relative;
+        }
+        
+        .tooltip-icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .tooltip-text {
+            font-size: 14px;
+            line-height: 1.4;
+            color: #333;
+        }
+        
+        .tooltip-close {
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #666;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .tooltip-close:hover {
+            color: #000;
+            background: #f0f0f0;
+            border-radius: 50%;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         </style>
         <?php
