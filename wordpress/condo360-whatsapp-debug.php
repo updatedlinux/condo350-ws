@@ -71,6 +71,13 @@ class Condo360WhatsAppPluginDebug {
             array(),
             '1.0.0-debug'
         );
+        
+        // Variables para JavaScript (incluyendo ajaxurl para frontend)
+        wp_localize_script('jquery', 'condo360ws_ajax', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('condo360ws_nonce'),
+            'api_url' => $this->api_url
+        ));
     }
     
     /**
@@ -224,33 +231,54 @@ class Condo360WhatsAppPluginDebug {
         
         <script>
         jQuery(document).ready(function($) {
+            // Verificar que las variables AJAX estén disponibles
+            if (typeof condo360ws_ajax === 'undefined') {
+                console.error('Condo360 WhatsApp Debug: Variables AJAX no disponibles');
+                $('#groups-loading').html('<p style="color: red;">Error: Variables AJAX no disponibles</p>').show();
+                return;
+            }
+            
+            console.log('Condo360 WhatsApp Debug: Variables AJAX disponibles', condo360ws_ajax);
+            
             // Función para cargar grupos
             function loadGroups() {
+                console.log('Condo360 WhatsApp Debug: Iniciando carga de grupos...');
                 $('#load-groups-btn').prop('disabled', true).text('Cargando...');
                 $('#groups-loading').show();
                 $('#groups-list').hide();
                 
+                console.log('Condo360 WhatsApp Debug: Enviando petición AJAX...', {
+                    url: condo360ws_ajax.ajax_url,
+                    action: 'condo360ws_get_groups',
+                    nonce: condo360ws_ajax.nonce
+                });
+                
                 $.ajax({
-                    url: ajaxurl,
+                    url: condo360ws_ajax.ajax_url,
                     type: 'POST',
                     data: {
                         action: 'condo360ws_get_groups',
-                        nonce: '<?php echo wp_create_nonce('condo360ws_nonce'); ?>'
+                        nonce: condo360ws_ajax.nonce
                     },
                     success: function(response) {
+                        console.log('Condo360 WhatsApp Debug: Respuesta AJAX recibida:', response);
                         $('#groups-loading').hide();
                         
                         if (response.success && response.data.groups) {
+                            console.log('Condo360 WhatsApp Debug: Mostrando grupos:', response.data.groups.length);
                             displayGroups(response.data.groups);
                         } else {
+                            console.error('Condo360 WhatsApp Debug: Error en respuesta:', response);
                             $('#groups-list').html('<p style="color: red;">Error cargando grupos: ' + (response.data || 'Error desconocido') + '</p>').show();
                         }
                     },
                     error: function(xhr, status, error) {
+                        console.error('Condo360 WhatsApp Debug: Error AJAX:', xhr, status, error);
                         $('#groups-loading').hide();
                         $('#groups-list').html('<p style="color: red;">Error AJAX: ' + error + '</p>').show();
                     },
                     complete: function() {
+                        console.log('Condo360 WhatsApp Debug: Petición AJAX completada');
                         $('#load-groups-btn').prop('disabled', false).text('Cargar Grupos');
                     }
                 });
@@ -311,13 +339,13 @@ class Condo360WhatsAppPluginDebug {
                 $('#set-group-btn').prop('disabled', true).text('Configurando...');
                 
                 $.ajax({
-                    url: ajaxurl,
+                    url: condo360ws_ajax.ajax_url,
                     type: 'POST',
                     data: {
                         action: 'condo360ws_set_group_db',
                         group_id: groupId,
                         group_name: groupName,
-                        nonce: '<?php echo wp_create_nonce('condo360ws_nonce'); ?>'
+                        nonce: condo360ws_ajax.nonce
                     },
                     success: function(response) {
                         if (response.success) {
