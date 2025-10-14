@@ -240,6 +240,38 @@ class Condo360WhatsAppService {
             }
         });
 
+        // Desconectar WhatsApp
+        this.app.post('/api/disconnect', async (req, res) => {
+            try {
+                const { secretKey } = req.body;
+
+                // Validar secret key
+                if (secretKey !== process.env.API_SECRET_KEY) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Clave de API inválida'
+                    });
+                }
+
+                // Desconectar WhatsApp
+                await this.whatsappService.destroy();
+                
+                logger.info('WhatsApp desconectado manualmente');
+                
+                res.json({
+                    success: true,
+                    message: 'WhatsApp desconectado correctamente'
+                });
+
+            } catch (error) {
+                logger.error('Error desconectando WhatsApp:', error);
+                res.status(500).json({ 
+                    success: false, 
+                    error: 'Error interno del servidor' 
+                });
+            }
+        });
+
         // Configurar grupo de destino
         this.app.post('/api/set-group', async (req, res) => {
             try {
