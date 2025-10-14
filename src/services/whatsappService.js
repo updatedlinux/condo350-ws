@@ -263,25 +263,28 @@ class WhatsAppService {
             for (const chat of chats) {
                 if (chat.isGroup) {
                     try {
+                        // Intentar obtener información completa del grupo
                         const groupInfo = await this.client.getGroupInfo(chat.id._serialized);
                         groups.push({
                             id: chat.id._serialized,
                             subject: chat.name || 'Sin nombre',
-                            participants: groupInfo.participants.length,
+                            participants: groupInfo.participants ? groupInfo.participants.length : 0,
                             creation: groupInfo.creation,
                             description: groupInfo.description || '',
                             isGroup: true
                         });
                     } catch (error) {
-                        // Si no se puede obtener info completa, usar datos básicos
+                        logger.warn(`No se pudo obtener info completa para grupo ${chat.id._serialized}:`, error.message);
+                        
+                        // Usar información básica del chat
                         groups.push({
                             id: chat.id._serialized,
                             subject: chat.name || 'Grupo sin nombre',
-                            participants: 0,
-                            creation: null,
-                            description: '',
+                            participants: chat.participantsCount || 0,
+                            creation: chat.createdAt || null,
+                            description: chat.description || '',
                             isGroup: true,
-                            error: 'No se pudo obtener información completa'
+                            error: 'Información básica (getGroupInfo falló)'
                         });
                     }
                 }

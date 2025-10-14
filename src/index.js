@@ -221,6 +221,24 @@ class Condo360WhatsAppService {
             }
         });
 
+        // Obtener grupo configurado desde la base de datos
+        this.app.get('/api/configured-group', async (req, res) => {
+            try {
+                const configuredGroup = await this.databaseService.getConfiguredGroup();
+                res.json({ 
+                    success: true, 
+                    data: {
+                        groupId: configuredGroup?.groupId || null,
+                        groupName: configuredGroup?.groupName || null,
+                        configuredAt: configuredGroup?.configuredAt || null
+                    }
+                });
+            } catch (error) {
+                logger.error('Error obteniendo grupo configurado:', error);
+                res.status(500).json({ success: false, error: 'Error interno del servidor' });
+            }
+        });
+
         // Configurar grupo de destino
         this.app.post('/api/set-group', async (req, res) => {
             try {

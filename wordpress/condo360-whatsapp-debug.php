@@ -530,6 +530,9 @@ class Condo360WhatsAppPluginDebug {
         $group_id = sanitize_text_field($_POST['group_id'] ?? '');
         $group_name = sanitize_text_field($_POST['group_name'] ?? '');
         
+        // Log para depuración
+        error_log("Condo360 Debug: Intentando guardar grupo - ID: $group_id, Name: $group_name");
+        
         if (empty($group_id)) {
             wp_send_json_error(array(
                 'message' => 'ID de grupo requerido'
@@ -539,6 +542,17 @@ class Condo360WhatsAppPluginDebug {
         // Guardar en la base de datos
         global $wpdb;
         $config_table = $wpdb->prefix . 'condo360ws_config';
+        
+        // Verificar que la tabla existe
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$config_table'");
+        if (!$table_exists) {
+            error_log("Condo360 Debug: Tabla $config_table no existe, creándola...");
+            $this->create_tables();
+        }
+        
+        // Verificar estructura de la tabla
+        $table_structure = $wpdb->get_results("DESCRIBE $config_table");
+        error_log("Condo360 Debug: Estructura de tabla: " . print_r($table_structure, true));
         
         $result = $wpdb->replace(
             $config_table,
@@ -550,15 +564,27 @@ class Condo360WhatsAppPluginDebug {
             array('%s', '%s', '%s')
         );
         
+        error_log("Condo360 Debug: Resultado de replace: " . print_r($result, true));
+        error_log("Condo360 Debug: Último error de DB: " . $wpdb->last_error);
+        
         if ($result !== false) {
+            // Verificar que se guardó correctamente
+            $saved_value = $wpdb->get_var($wpdb->prepare(
+                "SELECT config_value FROM $config_table WHERE config_key = %s",
+                'whatsapp_group_id'
+            ));
+            
+            error_log("Condo360 Debug: Valor guardado verificado: $saved_value");
+            
             wp_send_json_success(array(
                 'message' => 'Grupo seleccionado correctamente',
                 'group_id' => $group_id,
-                'group_name' => $group_name
+                'group_name' => $group_name,
+                'saved_value' => $saved_value
             ));
         } else {
             wp_send_json_error(array(
-                'message' => 'Error guardando grupo en base de datos'
+                'message' => 'Error guardando grupo en base de datos: ' . $wpdb->last_error
             ));
         }
     }

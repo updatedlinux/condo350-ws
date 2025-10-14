@@ -261,6 +261,43 @@ class DatabaseService {
     }
 
     /**
+     * Obtiene el grupo configurado desde la base de datos de WordPress
+     */
+    async getConfiguredGroup() {
+        try {
+            // Buscar en la tabla de configuración de WordPress
+            const [rows] = await this.connection.execute(
+                'SELECT config_value, updated_at FROM wp_condo360ws_config WHERE config_key = ?',
+                ['whatsapp_group_id']
+            );
+
+            if (rows.length > 0) {
+                const groupId = rows[0].config_value;
+                const configuredAt = rows[0].updated_at;
+                
+                // Intentar obtener el nombre del grupo desde los logs de mensajes
+                const [nameRows] = await this.connection.execute(
+                    'SELECT group_name FROM condo360ws_messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
+                    [groupId]
+                );
+                
+                const groupName = nameRows.length > 0 ? nameRows[0].group_name : 'Grupo desconocido';
+                
+                return {
+                    groupId,
+                    groupName,
+                    configuredAt
+                };
+            }
+
+            return null;
+        } catch (error) {
+            logger.error('Error obteniendo grupo configurado:', error);
+            return null;
+        }
+    }
+
+    /**
      * Limpia logs antiguos (más de 30 días)
      */
     async cleanOldLogs() {
