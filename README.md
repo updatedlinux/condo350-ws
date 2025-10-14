@@ -1,195 +1,108 @@
 # Condo360 WhatsApp Service
 
-Un servicio completo de Node.js con Baileys para conectar WhatsApp y enviar mensajes a grupos específicos, integrado con WordPress mediante shortcodes.
+Servicio completo de WhatsApp para WordPress que permite conectar WhatsApp vía QR y enviar mensajes a grupos específicos.
 
-## 📋 Características
+## 🚀 Características
 
-- ✅ Conexión a WhatsApp mediante código QR
-- ✅ Persistencia de sesión para evitar reconexiones frecuentes
-- ✅ API REST para obtener QR y enviar mensajes
-- ✅ **NUEVO**: Lista de grupos disponibles después de autenticación
-- ✅ **NUEVO**: Selección visual de grupo de destino desde WordPress
-- ✅ Shortcode de WordPress para mostrar estado y QR
-- ✅ Actualización automática del QR cada 10 segundos
-- ✅ Reconexión automática en caso de desconexión
-- ✅ Integración con base de datos de WordPress
-- ✅ Logging completo de mensajes y conexiones
-- ✅ Seguridad básica con tokens de API
-- ✅ Interfaz responsive y moderna
+- ✅ **Conexión vía QR**: Escanea el código QR con WhatsApp para conectar
+- ✅ **Gestión de Grupos**: Visualiza y selecciona grupos de WhatsApp
+- ✅ **Persistencia de Sesión**: Mantiene la conexión activa
+- ✅ **API REST**: Endpoints para integrar con WordPress
+- ✅ **Plugin WordPress**: Shortcode `[wa_connect_qr]` para administradores
+- ✅ **Interfaz Intuitiva**: Diseño moderno y responsive
 
-## 🏗️ Arquitectura
+## 📋 Requisitos
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   WordPress     │    │   Node.js API   │    │   WhatsApp      │
-│   Shortcode     │◄──►│   (Puerto 3003) │◄──►│   (Baileys)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │
-         │                       │
-         ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐
-│   WordPress DB  │    │   Sesiones      │
-│   condo360ws_*  │    │   (JSON files)  │
-└─────────────────┘    └─────────────────┘
-```
-
-## 🚀 Instalación
-
-### Prerrequisitos
-
-- Node.js 16+ 
-- MySQL/MariaDB (base de datos de WordPress)
+- Node.js 16+
+- PHP 7.4+
 - WordPress 5.0+
-- Nginx Proxy Manager (para SSL)
+- MySQL/MariaDB
+- Chromium (para whatsapp-web.js)
 
-### 1. Clonar e instalar dependencias
+## 🛠️ Instalación
+
+### 1. Backend Node.js
 
 ```bash
+# Clonar el repositorio
 git clone <repository-url>
 cd condo350-ws
+
+# Instalar dependencias
 npm install
-```
 
-### 2. Configurar variables de entorno
-
-Copia el archivo de ejemplo y configura las variables:
-
-```bash
+# Configurar variables de entorno
 cp env.example .env
+# Editar .env con tus configuraciones
+
+# Iniciar el servicio
+npm start
 ```
 
-Edita el archivo `.env`:
+### 2. Plugin WordPress
+
+1. Sube la carpeta `wordpress/` a `/wp-content/plugins/condo360-whatsapp/`
+2. Activa el plugin "Condo360 WhatsApp Service" en WordPress
+3. Usa el shortcode `[wa_connect_qr]` en cualquier página
+
+## ⚙️ Configuración
+
+### Variables de Entorno (.env)
 
 ```env
 # Puerto del servidor
 PORT=3003
 
-# Configuración de WhatsApp
-WHATSAPP_GROUP_ID=
-WHATSAPP_SESSION_PATH=./sessions
-
-# Configuración de base de datos WordPress
+# Base de datos WordPress
 DB_HOST=localhost
 DB_USER=wordpress_user
-DB_PASSWORD=wordpress_password
+DB_PASSWORD=tu_password
 DB_NAME=wordpress_db
-DB_PORT=3306
 
-# Configuración de seguridad
-API_SECRET_KEY=condo360_whatsapp_secret_2025
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
+# WhatsApp
+WHATSAPP_GROUP_ID=
 
-# Configuración de logs
-LOG_LEVEL=info
-LOG_FILE=./logs/whatsapp-service.log
-
-# Configuración de reconexión
-RECONNECT_INTERVAL=30000
-QR_REFRESH_INTERVAL=10000
+# API
+API_SECRET=condo360_whatsapp_secret_2025
 ```
 
-### 3. Crear directorios necesarios
+### Nginx Proxy Manager
 
-```bash
-mkdir -p sessions logs
-```
+Configura el proxy para `wschat.bonaventurecclub.com` apuntando al puerto 3003.
 
-### 4. Instalar plugin de WordPress
+## 📱 Uso
 
-1. Copia la carpeta `wordpress/` a `wp-content/plugins/condo360-whatsapp/`
-2. Activa el plugin desde el panel de administración de WordPress
-3. Ve a `Configuración > WhatsApp Service` y configura la URL del API
+### 1. Conectar WhatsApp
 
-### 5. Configurar Nginx Proxy Manager
+1. Ve a la página con el shortcode `[wa_connect_qr]`
+2. Escanea el código QR con WhatsApp
+3. Espera a que aparezca "WhatsApp está conectado"
 
-1. Crea un nuevo proxy host en NPM
-2. Configura el dominio: `wschat.bonaventurecclub.com`
-3. Configura el destino: `http://localhost:3003`
-4. Habilita SSL y fuerza HTTPS
+### 2. Seleccionar Grupo
 
-## 🎯 Uso
+1. Una vez conectado, se mostrarán los grupos disponibles
+2. Haz clic en el grupo que deseas usar
+3. Confirma la selección
+4. El grupo quedará guardado en la base de datos
 
-### Iniciar el servicio
+### 3. Enviar Mensajes
 
-```bash
-# Desarrollo
-npm run dev
-
-# Producción
-npm start
-```
-
-### Usar el shortcode en WordPress
-
-Agrega el shortcode en cualquier página o entrada:
-
-```php
-[wa_connect_qr]
-```
-
-Parámetros disponibles:
-
-- `show_status="true"` - Mostrar estado de conexión
-- `auto_refresh="true"` - Actualizar automáticamente
-- `refresh_interval="10000"` - Intervalo en milisegundos
-
-Ejemplo completo:
-
-```php
-[wa_connect_qr show_status="true" auto_refresh="true" refresh_interval="10000"]
-```
-
-### Conectar WhatsApp
-
-1. El shortcode mostrará automáticamente el código QR
-2. Abre WhatsApp en tu teléfono
-3. Ve a `Configuración > Dispositivos vinculados`
-4. Toca `Vincular un dispositivo`
-5. Escanea el código QR mostrado
-
-### Seleccionar Grupo de Destino
-
-Una vez conectado WhatsApp:
-
-1. Haz clic en **"Cargar Grupos"** para ver todos los grupos disponibles
-2. Selecciona el grupo al que quieres enviar mensajes
-3. Haz clic en **"Configurar como Grupo de Destino"**
-4. El grupo quedará configurado para recibir mensajes automáticamente
-
-### Enviar mensajes
-
-Una vez conectado, puedes enviar mensajes usando el API:
+Usa el endpoint `/api/send-message` para enviar mensajes:
 
 ```bash
 curl -X POST https://wschat.bonaventurecclub.com/api/send-message \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer condo360_whatsapp_secret_2025" \
   -d '{
     "message": "Hola desde Condo360!",
-    "secretKey": "condo360_whatsapp_secret_2025"
+    "groupId": "grupo_id_aqui"
   }'
 ```
 
-## 📡 API Endpoints
-
-### GET /health
-Verifica el estado del servicio.
-
-**Respuesta:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2025-01-27T10:30:00.000Z",
-  "uptime": 3600,
-  "whatsapp": {
-    "connected": true,
-    "qrGenerated": false
-  }
-}
-```
+## 🔌 API Endpoints
 
 ### GET /api/status
-Obtiene el estado de conexión de WhatsApp.
+Obtiene el estado de la conexión de WhatsApp.
 
 **Respuesta:**
 ```json
@@ -198,8 +111,7 @@ Obtiene el estado de conexión de WhatsApp.
   "data": {
     "connected": true,
     "qrGenerated": false,
-    "lastConnection": "2025-01-27T10:30:00.000Z",
-    "groupId": "120363123456789012@g.us"
+    "groupId": "grupo_seleccionado"
   }
 }
 ```
@@ -212,39 +124,40 @@ Obtiene el código QR para conectar WhatsApp.
 {
   "success": true,
   "connected": false,
-  "qr": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
-  "expiresAt": "2025-01-27T10:31:00.000Z"
+  "qr": "base64_image_data",
+  "expiresAt": "2025-10-13T23:32:16.417Z"
 }
 ```
 
 ### GET /api/groups
-Obtiene todos los grupos disponibles en WhatsApp.
+Obtiene la lista de grupos de WhatsApp.
 
 **Respuesta:**
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": "120363123456789012@g.us",
-      "subject": "Grupo de Trabajo",
-      "participants": 15,
-      "creation": 1640995200,
-      "description": "Grupo para coordinación de trabajo",
-      "isGroup": true
-    }
-  ]
+  "data": {
+    "groups": [
+      {
+        "id": "grupo_id",
+        "subject": "Nombre del Grupo",
+        "participants": 5,
+        "creation": "2025-01-01T00:00:00.000Z",
+        "description": "Descripción del grupo"
+      }
+    ]
+  }
 }
 ```
 
 ### POST /api/send-message
-Envía un mensaje al grupo configurado.
+Envía un mensaje a un grupo específico.
 
-**Parámetros:**
+**Body:**
 ```json
 {
-  "message": "Texto del mensaje",
-  "secretKey": "condo360_whatsapp_secret_2025"
+  "message": "Mensaje a enviar",
+  "groupId": "grupo_id_opcional"
 }
 ```
 
@@ -252,221 +165,55 @@ Envía un mensaje al grupo configurado.
 ```json
 {
   "success": true,
-  "messageId": "3EB0C767D26A8A6C",
-  "error": null
-}
-```
-
-### POST /api/set-group
-Configura el ID del grupo de destino.
-
-**Parámetros:**
-```json
-{
-  "groupId": "120363123456789012@g.us",
-  "secretKey": "condo360_whatsapp_secret_2025"
+  "message": "Mensaje enviado correctamente",
+  "groupId": "grupo_id"
 }
 ```
 
 ## 🗄️ Base de Datos
 
-El plugin crea las siguientes tablas en la base de datos de WordPress:
+El plugin crea la tabla `wp_condo360ws_config` para almacenar:
 
-### condo360ws_config
-Almacena la configuración del servicio.
+- `whatsapp_group_id`: ID del grupo seleccionado
+- `api_url`: URL del API
+- `api_secret`: Clave secreta del API
 
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| id | INT | ID único |
-| config_key | VARCHAR(100) | Clave de configuración |
-| config_value | TEXT | Valor de configuración |
-| created_at | TIMESTAMP | Fecha de creación |
-| updated_at | TIMESTAMP | Fecha de actualización |
+## 🔧 Solución de Problemas
 
-### condo360ws_messages
-Registra todos los mensajes enviados.
+### Error de Conexión
+- Verifica que el puerto 3003 esté disponible
+- Revisa los logs del servicio
+- Confirma que Chromium esté instalado
 
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| id | INT | ID único |
-| group_id | VARCHAR(100) | ID del grupo |
-| message | TEXT | Contenido del mensaje |
-| status | ENUM | Estado: sent, failed, pending |
-| message_id | VARCHAR(100) | ID del mensaje en WhatsApp |
-| error_message | TEXT | Mensaje de error si falla |
-| created_at | TIMESTAMP | Fecha de envío |
+### QR No Aparece
+- Limpia las sesiones: `rm -rf sessions/*`
+- Reinicia el servicio
+- Verifica que no haya procesos de Chrome bloqueados
 
-### condo360ws_connections
-Registra eventos de conexión.
+### Plugin No Funciona
+- Verifica que el plugin esté activado
+- Confirma que el usuario sea administrador
+- Revisa la consola del navegador para errores
 
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| id | INT | ID único |
-| status | ENUM | Estado: connected, disconnected, qr_generated, error |
-| qr_code | TEXT | Código QR generado |
-| error_message | TEXT | Mensaje de error |
-| user_info | JSON | Información del usuario |
-| created_at | TIMESTAMP | Fecha del evento |
+## 📝 Logs
 
-## 🔧 Configuración Avanzada
-
-### Variables de Entorno
-
-| Variable | Descripción | Valor por defecto |
-|----------|-------------|-------------------|
-| `PORT` | Puerto del servidor | 3003 |
-| `WHATSAPP_GROUP_ID` | ID del grupo de destino | - |
-| `WHATSAPP_SESSION_PATH` | Ruta de sesiones | ./sessions |
-| `DB_HOST` | Host de la base de datos | localhost |
-| `DB_USER` | Usuario de la base de datos | wordpress_user |
-| `DB_PASSWORD` | Contraseña de la base de datos | wordpress_password |
-| `DB_NAME` | Nombre de la base de datos | wordpress_db |
-| `DB_PORT` | Puerto de la base de datos | 3306 |
-| `API_SECRET_KEY` | Clave secreta del API | condo360_whatsapp_secret_2025 |
-| `RATE_LIMIT_WINDOW_MS` | Ventana de rate limiting | 900000 |
-| `RATE_LIMIT_MAX_REQUESTS` | Máximo de requests | 100 |
-| `LOG_LEVEL` | Nivel de logging | info |
-| `LOG_FILE` | Archivo de logs | ./logs/whatsapp-service.log |
-| `RECONNECT_INTERVAL` | Intervalo de reconexión | 30000 |
-| `QR_REFRESH_INTERVAL` | Intervalo de refresco QR | 10000 |
-
-### Obtener ID de Grupo
-
-Para obtener el ID de un grupo de WhatsApp:
-
-1. Agrega el bot a un grupo
-2. Envía cualquier mensaje al grupo
-3. Revisa los logs del servicio
-4. Busca el ID del grupo en los logs
-
-El formato del ID es: `120363123456789012@g.us`
-
-## 🛠️ Desarrollo
-
-### Estructura del Proyecto
-
-```
-condo350-ws/
-├── src/
-│   ├── index.js                 # Servidor principal
-│   ├── services/
-│   │   ├── whatsappService.js   # Servicio de WhatsApp
-│   │   └── databaseService.js  # Servicio de base de datos
-│   └── utils/
-│       └── logger.js            # Sistema de logging
-├── wordpress/
-│   ├── condo360-whatsapp-plugin.php  # Plugin principal
-│   └── assets/
-│       ├── style.css            # Estilos del shortcode
-│       └── script.js           # JavaScript del shortcode
-├── sessions/                    # Sesiones de WhatsApp
-├── logs/                       # Archivos de log
-├── package.json
-├── env.example
-└── README.md
-```
-
-### Scripts Disponibles
-
-```bash
-# Desarrollo con nodemon
-npm run dev
-
-# Producción
-npm start
-
-# Ver logs en tiempo real
-tail -f logs/whatsapp-service.log
-```
-
-### Debugging
-
-Para habilitar logs detallados:
-
-```env
-LOG_LEVEL=debug
-```
+Los logs se guardan en:
+- Backend: Consola del terminal
+- WordPress: Logs de PHP y JavaScript
 
 ## 🔒 Seguridad
 
-### Recomendaciones
-
-1. **Cambiar la clave secreta**: Modifica `API_SECRET_KEY` por una clave única y segura
-2. **Rate limiting**: El servicio incluye rate limiting por defecto
-3. **HTTPS**: Usa siempre HTTPS en producción
-4. **Firewall**: Restringe el acceso al puerto 3003 solo desde Nginx
-5. **Logs**: Revisa regularmente los logs para detectar actividad sospechosa
-
-### Permisos de WordPress
-
-- Solo usuarios administradores pueden ver el shortcode
-- Todas las peticiones AJAX requieren nonce válido
-- Validación de permisos en cada endpoint
-
-## 🐛 Solución de Problemas
-
-### Problemas Comunes
-
-#### QR no se genera
-- Verifica que el servicio esté ejecutándose
-- Revisa los logs para errores
-- Asegúrate de que no haya otra sesión activa
-
-#### Mensajes no se envían
-- Verifica que WhatsApp esté conectado
-- Confirma que el grupo ID esté configurado
-- Revisa que la clave secreta sea correcta
-
-#### Error de conexión a base de datos
-- Verifica las credenciales en `.env`
-- Asegúrate de que MySQL esté ejecutándose
-- Confirma que la base de datos existe
-
-#### Shortcode no aparece
-- Verifica que el plugin esté activado
-- Confirma que eres administrador
-- Revisa la consola del navegador para errores
-
-### Logs
-
-Los logs se guardan en `logs/whatsapp-service.log`. Para monitorear en tiempo real:
-
-```bash
-tail -f logs/whatsapp-service.log
-```
-
-### Reiniciar Sesión
-
-Si necesitas reiniciar la sesión de WhatsApp:
-
-1. Detén el servicio
-2. Elimina la carpeta `sessions/`
-3. Reinicia el servicio
-4. Escanea el nuevo QR
+- Solo administradores pueden usar el shortcode
+- Autenticación requerida para endpoints
+- Validación de entrada en todos los endpoints
+- Rate limiting implementado
 
 ## 📞 Soporte
 
-Para soporte técnico o reportar bugs:
-
-1. Revisa los logs del servicio
-2. Verifica la configuración
-3. Consulta este README
-4. Contacta al equipo de desarrollo
-
-## 📄 Licencia
-
-Este proyecto está bajo la licencia MIT. Ver el archivo LICENSE para más detalles.
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
+Para soporte técnico, contacta a Condo360.
 
 ---
 
-**Desarrollado para Condo360** 🏢
+**Versión:** 1.0.0  
+**Autor:** Condo360  
+**Licencia:** MIT

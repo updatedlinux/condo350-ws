@@ -21,17 +21,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Definir constantes del plugin
-define('CONDO360WS_VERSION', '1.0.0');
-define('CONDO360WS_PLUGIN_FILE', __FILE__);
-define('CONDO360WS_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('CONDO360WS_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('CONDO360WS_PLUGIN_BASENAME', plugin_basename(__FILE__));
-
 /**
- * Clase principal del plugin Condo360 WhatsApp
+ * Clase principal del plugin Condo360 WhatsApp (Direct Test)
  */
-class Condo360WhatsAppPlugin {
+class Condo360WhatsAppPluginDirectTest {
     
     private $api_url;
     private $api_secret;
@@ -45,12 +38,10 @@ class Condo360WhatsAppPlugin {
         
         add_action('init', array($this, 'init'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
-        add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('wp_ajax_condo360ws_get_status', array($this, 'ajax_get_status'));
         add_action('wp_ajax_condo360ws_get_qr', array($this, 'ajax_get_qr'));
         add_action('wp_ajax_condo360ws_get_groups', array($this, 'ajax_get_groups'));
         add_action('wp_ajax_condo360ws_set_group', array($this, 'ajax_set_group'));
-        add_action('wp_ajax_condo360ws_send_message', array($this, 'ajax_send_message'));
         
         // Shortcode
         add_shortcode('wa_connect_qr', array($this, 'shortcode_wa_connect_qr'));
@@ -64,9 +55,6 @@ class Condo360WhatsAppPlugin {
      * Inicialización del plugin
      */
     public function init() {
-        // Cargar traducciones
-        load_plugin_textdomain('condo360ws', false, dirname(plugin_basename(__FILE__)) . '/languages');
-        
         // Crear tablas si no existen
         $this->create_tables();
     }
@@ -75,36 +63,16 @@ class Condo360WhatsAppPlugin {
      * Cargar scripts y estilos
      */
     public function enqueue_scripts() {
+        // Cargar jQuery
         wp_enqueue_script('jquery');
+        
+        // Cargar CSS
         wp_enqueue_style(
             'condo360ws-style',
-            CONDO360WS_PLUGIN_URL . 'assets/style.css',
+            plugin_dir_url(__FILE__) . 'assets/style.css',
             array(),
-            CONDO360WS_VERSION
+            '1.0.0-direct-test'
         );
-        wp_enqueue_script(
-            'condo360ws-script',
-            CONDO360WS_PLUGIN_URL . 'assets/script.js',
-            array('jquery'),
-            CONDO360WS_VERSION,
-            true
-        );
-        
-        // Variables para JavaScript
-        wp_localize_script('condo360ws-script', 'condo360ws_ajax', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('condo360ws_nonce'),
-            'api_url' => $this->api_url,
-            'refresh_interval' => 10000, // 10 segundos
-            'strings' => array(
-                'connected' => __('WhatsApp Conectado', 'condo360ws'),
-                'disconnected' => __('WhatsApp Desconectado', 'condo360ws'),
-                'scan_qr' => __('Escanea el código QR para conectar WhatsApp', 'condo360ws'),
-                'qr_expired' => __('El código QR ha expirado. Actualizando...', 'condo360ws'),
-                'error_loading' => __('Error cargando estado de WhatsApp', 'condo360ws'),
-                'admin_only' => __('Solo administradores pueden ver este contenido', 'condo360ws')
-            )
-        ));
     }
     
     /**
@@ -127,40 +95,8 @@ class Condo360WhatsAppPlugin {
             UNIQUE KEY config_key (config_key)
         ) $charset_collate;";
         
-        // Tabla de mensajes
-        $messages_table = $wpdb->prefix . 'condo360ws_messages';
-        $messages_sql = "CREATE TABLE IF NOT EXISTS $messages_table (
-            id int(11) NOT NULL AUTO_INCREMENT,
-            group_id varchar(100) NOT NULL,
-            message text NOT NULL,
-            status enum('sent','failed','pending') DEFAULT 'pending',
-            message_id varchar(100),
-            error_message text,
-            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_group_id (group_id),
-            KEY idx_status (status),
-            KEY idx_created_at (created_at)
-        ) $charset_collate;";
-        
-        // Tabla de conexiones
-        $connections_table = $wpdb->prefix . 'condo360ws_connections';
-        $connections_sql = "CREATE TABLE IF NOT EXISTS $connections_table (
-            id int(11) NOT NULL AUTO_INCREMENT,
-            status enum('connected','disconnected','qr_generated','error') NOT NULL,
-            qr_code text,
-            error_message text,
-            user_info text,
-            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_status (status),
-            KEY idx_created_at (created_at)
-        ) $charset_collate;";
-        
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($config_sql);
-        dbDelta($messages_sql);
-        dbDelta($connections_sql);
     }
     
     /**
@@ -169,93 +105,282 @@ class Condo360WhatsAppPlugin {
     public function shortcode_wa_connect_qr($atts) {
         // Solo mostrar a administradores
         if (!current_user_can('administrator')) {
-            return '<div class="condo360ws-error">' . __('Solo administradores pueden ver este contenido', 'condo360ws') . '</div>';
+            return '<div class="condo360ws-error">Solo administradores pueden ver este contenido</div>';
         }
         
-        $atts = shortcode_atts(array(
-            'show_status' => 'true',
-            'auto_refresh' => 'true',
-            'refresh_interval' => '10000'
-        ), $atts);
+        // Probar comunicación directa con el API
+        $api_test = $this->test_api_connection();
         
         ob_start();
         ?>
-        <div class="condo360ws-container" data-auto-refresh="<?php echo esc_attr($atts['auto_refresh']); ?>" data-refresh-interval="<?php echo esc_attr($atts['refresh_interval']); ?>">
+        <div class="condo360ws-container">
             <div class="condo360ws-header">
-                <h3><?php _e('Estado de WhatsApp', 'condo360ws'); ?></h3>
+                <h3>Estado de WhatsApp</h3>
                 <div class="condo360ws-status-indicator" id="condo360ws-status">
-                    <span class="status-dot"></span>
-                    <span class="status-text"><?php _e('Verificando...', 'condo360ws'); ?></span>
+                    <span class="status-dot <?php echo $api_test['success'] ? 'connected' : 'disconnected'; ?>"></span>
+                    <span class="status-text">
+                        <?php echo $api_test['success'] ? 'API Conectado' : 'API Error'; ?>
+                    </span>
                 </div>
             </div>
             
             <div class="condo360ws-content">
-                <div class="condo360ws-qr-container" id="condo360ws-qr-container" style="display: none;">
-                    <h4><?php _e('Escanea el código QR para conectar WhatsApp', 'condo360ws'); ?></h4>
-                    <div class="qr-code-wrapper">
-                        <img id="condo360ws-qr-image" src="" alt="Código QR de WhatsApp" />
-                    </div>
-                    <p class="qr-instructions">
-                        <?php _e('1. Abre WhatsApp en tu teléfono', 'condo360ws'); ?><br>
-                        <?php _e('2. Toca el menú (⋮) y selecciona "Dispositivos vinculados"', 'condo360ws'); ?><br>
-                        <?php _e('3. Toca "Vincular un dispositivo"', 'condo360ws'); ?><br>
-                        <?php _e('4. Escanea este código QR', 'condo360ws'); ?>
-                    </p>
-                </div>
-                
-                <div class="condo360ws-connected" id="condo360ws-connected" style="display: none;">
-                    <div class="success-icon">✓</div>
-                    <h4><?php _e('WhatsApp Conectado', 'condo360ws'); ?></h4>
-                    <p><?php _e('El servicio de WhatsApp está funcionando correctamente.', 'condo360ws'); ?></p>
-                    
-                    <div class="groups-section">
-                        <h5><?php _e('Grupos Disponibles', 'condo360ws'); ?></h5>
-                        <button type="button" id="condo360ws-load-groups-btn" class="load-groups-btn">
-                            <?php _e('Cargar Grupos', 'condo360ws'); ?>
-                        </button>
+                <?php if ($api_test['success']): ?>
+                    <div class="condo360ws-connected">
+                        <div class="success-icon">✓</div>
+                        <h4>Comunicación con API Exitosa</h4>
+                        <p>El plugin puede comunicarse correctamente con el API.</p>
                         
-                        <div class="groups-container" id="condo360ws-groups-container" style="display: none;">
-                            <div class="groups-loading" id="condo360ws-groups-loading" style="display: none;">
-                                <div class="loading-spinner"></div>
-                                <span><?php _e('Cargando grupos...', 'condo360ws'); ?></span>
-                            </div>
-                            
-                            <div class="groups-list" id="condo360ws-groups-list">
-                                <!-- Los grupos se cargarán aquí dinámicamente -->
-                            </div>
-                            
-                            <div class="selected-group" id="condo360ws-selected-group" style="display: none;">
-                                <h6><?php _e('Grupo Seleccionado:', 'condo360ws'); ?></h6>
-                                <div class="selected-group-info">
-                                    <span class="group-name"></span>
-                                    <span class="group-id"></span>
+                        <?php if ($api_test['data']['connected']): ?>
+                            <div style="margin-top: 20px; padding: 15px; background: #e8f5e8; border-radius: 4px;">
+                                <strong>WhatsApp está conectado</strong>
+                                <div id="groups-section" style="margin-top: 15px;">
+                                    <h5>Grupos Disponibles:</h5>
+                                    <div id="groups-loading" style="text-align: center; padding: 20px;">
+                                        <div class="spinner"></div>
+                                        <p>Cargando grupos...</p>
+                                    </div>
+                                    <div id="groups-list" style="display: none;">
+                                        <!-- Los grupos se cargarán aquí -->
+                                    </div>
                                 </div>
-                                <button type="button" id="condo360ws-set-group-btn" class="set-group-btn">
-                                    <?php _e('Configurar como Grupo de Destino', 'condo360ws'); ?>
-                                </button>
                             </div>
-                        </div>
+                        <?php elseif ($api_test['data']['qrGenerated']): ?>
+                            <div style="margin-top: 20px;">
+                                <h5>Escanea este código QR con WhatsApp:</h5>
+                                <?php 
+                                $qr_data = $this->get_qr_direct();
+                                if ($qr_data): 
+                                ?>
+                                    <div class="qr-code-wrapper">
+                                        <img src="data:image/png;base64,<?php echo esc_attr($qr_data); ?>" alt="Código QR de WhatsApp" style="max-width: 300px; border: 2px solid #ddd; border-radius: 8px;" />
+                                    </div>
+                                    <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                                        <strong>Instrucciones:</strong><br>
+                                        1. Abre WhatsApp en tu teléfono<br>
+                                        2. Ve a Configuración > Dispositivos vinculados<br>
+                                        3. Toca "Vincular un dispositivo"<br>
+                                        4. Escanea este código QR
+                                    </p>
+                                <?php else: ?>
+                                    <p>Error obteniendo QR</p>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 4px;">
+                                <strong>WhatsApp desconectado y sin QR</strong>
+                                <p>Esperando conexión...</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                </div>
-                
-                <div class="condo360ws-error" id="condo360ws-error" style="display: none;">
-                    <div class="error-icon">⚠</div>
-                    <h4><?php _e('Error de Conexión', 'condo360ws'); ?></h4>
-                    <p id="condo360ws-error-message"></p>
-                </div>
+                <?php else: ?>
+                    <div class="condo360ws-error">
+                        <div class="error-icon">⚠</div>
+                        <h4>Error de Comunicación con API</h4>
+                        <p><strong>Error:</strong> <?php echo esc_html($api_test['error']); ?></p>
+                        <p><strong>URL:</strong> <?php echo esc_html($this->api_url . '/api/status'); ?></p>
+                    </div>
+                <?php endif; ?>
             </div>
             
             <div class="condo360ws-footer">
-                <button type="button" id="condo360ws-refresh-btn" class="refresh-btn">
-                    <?php _e('Actualizar Estado', 'condo360ws'); ?>
+                <button type="button" onclick="location.reload();" class="refresh-btn">
+                    Actualizar Estado
                 </button>
                 <div class="last-updated">
-                    <?php _e('Última actualización:', 'condo360ws'); ?> <span id="condo360ws-last-update">--</span>
+                    Última actualización: <?php echo date('H:i:s'); ?>
                 </div>
             </div>
         </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Función para cargar grupos
+            function loadGroups() {
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'condo360ws_get_groups',
+                        nonce: '<?php echo wp_create_nonce('condo360ws_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.groups) {
+                            displayGroups(response.data.groups);
+                        } else {
+                            $('#groups-loading').html('<p style="color: red;">Error cargando grupos: ' + (response.data || 'Error desconocido') + '</p>');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $('#groups-loading').html('<p style="color: red;">Error AJAX: ' + error + '</p>');
+                    }
+                });
+            }
+            
+            // Función para mostrar grupos
+            function displayGroups(groups) {
+                var html = '<div class="groups-list">';
+                
+                if (groups.length === 0) {
+                    html += '<p>No se encontraron grupos.</p>';
+                } else {
+                    html += '<p>Selecciona un grupo para enviar mensajes:</p>';
+                    html += '<div class="groups-grid">';
+                    
+                    groups.forEach(function(group) {
+                        html += '<div class="group-item" data-group-id="' + group.id + '">';
+                        html += '<div class="group-name">' + group.name + '</div>';
+                        html += '<div class="group-id">ID: ' + group.id + '</div>';
+                        html += '<div class="group-participants">' + group.participantsCount + ' participantes</div>';
+                        html += '</div>';
+                    });
+                    
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+                
+                $('#groups-loading').hide();
+                $('#groups-list').html(html).show();
+                
+                // Agregar evento click a los grupos
+                $('.group-item').on('click', function() {
+                    var groupId = $(this).data('group-id');
+                    var groupName = $(this).find('.group-name').text();
+                    
+                    if (confirm('¿Deseas seleccionar el grupo "' + groupName + '" como destino para los mensajes?')) {
+                        selectGroup(groupId, groupName);
+                    }
+                });
+            }
+            
+            // Función para seleccionar grupo
+            function selectGroup(groupId, groupName) {
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'condo360ws_set_group',
+                        group_id: groupId,
+                        nonce: '<?php echo wp_create_nonce('condo360ws_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Grupo "' + groupName + '" seleccionado correctamente.\nID: ' + groupId);
+                            location.reload();
+                        } else {
+                            alert('Error seleccionando grupo: ' + (response.data || 'Error desconocido'));
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error AJAX: ' + error);
+                    }
+                });
+            }
+            
+            // Cargar grupos si WhatsApp está conectado
+            <?php if ($api_test['success'] && $api_test['data']['connected']): ?>
+                loadGroups();
+            <?php endif; ?>
+            
+            // Auto-refresh cada 10 segundos si no está conectado
+            <?php if (!$api_test['success'] || !$api_test['data']['connected']): ?>
+                setInterval(function() {
+                    location.reload();
+                }, 10000);
+            <?php endif; ?>
+        });
+        </script>
         <?php
         return ob_get_clean();
+    }
+    
+    /**
+     * Probar conexión directa con el API
+     */
+    private function test_api_connection() {
+        $url = $this->api_url . '/api/status';
+        
+        // Probar con wp_remote_get
+        $response = wp_remote_get($url, array(
+            'timeout' => 10,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'User-Agent' => 'WordPress/' . get_bloginfo('version') . '; ' . home_url()
+            )
+        ));
+        
+        if (is_wp_error($response)) {
+            return array(
+                'success' => false,
+                'error' => 'wp_remote_get error: ' . $response->get_error_message()
+            );
+        }
+        
+        $http_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        if ($http_code !== 200) {
+            return array(
+                'success' => false,
+                'error' => "HTTP Error $http_code: " . $body
+            );
+        }
+        
+        $data = json_decode($body, true);
+        
+        if (!$data) {
+            return array(
+                'success' => false,
+                'error' => 'Invalid JSON response: ' . $body
+            );
+        }
+        
+        if (!$data['success']) {
+            return array(
+                'success' => false,
+                'error' => 'API Error: ' . ($data['error'] ?? 'Unknown error')
+            );
+        }
+        
+        return array(
+            'success' => true,
+            'data' => $data['data']
+        );
+    }
+    
+    /**
+     * Obtener grupos directamente del API
+     */
+    private function get_groups_direct() {
+        $url = $this->api_url . '/api/groups';
+        
+        $response = wp_remote_get($url, array(
+            'timeout' => 10,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'User-Agent' => 'WordPress/' . get_bloginfo('version') . '; ' . home_url()
+            )
+        ));
+        
+        if (is_wp_error($response)) {
+            return false;
+        }
+        
+        $http_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        if ($http_code !== 200) {
+            return false;
+        }
+        
+        $data = json_decode($body, true);
+        
+        if ($data && $data['success'] && isset($data['data']['groups'])) {
+            return $data['data']['groups'];
+        }
+        
+        return false;
     }
     
     /**
@@ -265,32 +390,16 @@ class Condo360WhatsAppPlugin {
         check_ajax_referer('condo360ws_nonce', 'nonce');
         
         if (!current_user_can('administrator')) {
-            wp_die(__('No tienes permisos para realizar esta acción', 'condo360ws'));
+            wp_die('No tienes permisos para realizar esta acción');
         }
         
-        $response = wp_remote_get($this->api_url . '/api/status', array(
-            'timeout' => 10,
-            'headers' => array(
-                'Content-Type' => 'application/json'
-            )
-        ));
+        $test = $this->test_api_connection();
         
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => __('Error conectando con el servicio de WhatsApp', 'condo360ws'),
-                'error' => $response->get_error_message()
-            ));
-        }
-        
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        
-        if ($data && $data['success']) {
-            wp_send_json_success($data['data']);
+        if ($test['success']) {
+            wp_send_json_success($test['data']);
         } else {
             wp_send_json_error(array(
-                'message' => __('Error obteniendo estado de WhatsApp', 'condo360ws'),
-                'error' => $data['error'] ?? 'Error desconocido'
+                'message' => $test['error']
             ));
         }
     }
@@ -302,241 +411,83 @@ class Condo360WhatsAppPlugin {
         check_ajax_referer('condo360ws_nonce', 'nonce');
         
         if (!current_user_can('administrator')) {
-            wp_die(__('No tienes permisos para realizar esta acción', 'condo360ws'));
+            wp_die('No tienes permisos para realizar esta acción');
         }
         
-        $response = wp_remote_get($this->api_url . '/api/qr', array(
-            'timeout' => 10,
-            'headers' => array(
-                'Content-Type' => 'application/json'
-            )
-        ));
+        $qr_data = $this->get_qr_direct();
         
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => __('Error obteniendo código QR', 'condo360ws'),
-                'error' => $response->get_error_message()
-            ));
-        }
-        
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        
-        if ($data && $data['success']) {
-            wp_send_json_success($data);
+        if ($qr_data) {
+            wp_send_json_success(array('qr' => $qr_data));
         } else {
             wp_send_json_error(array(
-                'message' => __('Error generando código QR', 'condo360ws'),
-                'error' => $data['error'] ?? 'Error desconocido'
+                'message' => 'Error generando código QR'
             ));
         }
     }
     
     /**
-     * AJAX: Obtener grupos disponibles
+     * AJAX: Obtener grupos de WhatsApp
      */
     public function ajax_get_groups() {
         check_ajax_referer('condo360ws_nonce', 'nonce');
         
         if (!current_user_can('administrator')) {
-            wp_die(__('No tienes permisos para realizar esta acción', 'condo360ws'));
+            wp_die('No tienes permisos para realizar esta acción');
         }
         
-        $response = wp_remote_get($this->api_url . '/api/groups', array(
-            'timeout' => 30,
-            'headers' => array(
-                'Content-Type' => 'application/json'
-            )
-        ));
+        $groups = $this->get_groups_direct();
         
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => __('Error obteniendo grupos de WhatsApp', 'condo360ws'),
-                'error' => $response->get_error_message()
-            ));
-        }
-        
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        
-        if ($data && $data['success']) {
-            wp_send_json_success($data['data']);
+        if ($groups !== false) {
+            wp_send_json_success(array('groups' => $groups));
         } else {
             wp_send_json_error(array(
-                'message' => __('Error obteniendo grupos', 'condo360ws'),
-                'error' => $data['error'] ?? 'Error desconocido'
+                'message' => 'Error obteniendo grupos'
             ));
         }
     }
     
     /**
-     * AJAX: Configurar grupo de destino
+     * AJAX: Establecer grupo seleccionado
      */
     public function ajax_set_group() {
         check_ajax_referer('condo360ws_nonce', 'nonce');
         
         if (!current_user_can('administrator')) {
-            wp_die(__('No tienes permisos para realizar esta acción', 'condo360ws'));
+            wp_die('No tienes permisos para realizar esta acción');
         }
         
-        $groupId = sanitize_text_field($_POST['groupId'] ?? '');
+        $group_id = sanitize_text_field($_POST['group_id']);
         
-        if (empty($groupId)) {
+        if (empty($group_id)) {
             wp_send_json_error(array(
-                'message' => __('ID de grupo requerido', 'condo360ws')
+                'message' => 'ID de grupo requerido'
             ));
         }
         
-        $response = wp_remote_post($this->api_url . '/api/set-group', array(
-            'timeout' => 10,
-            'headers' => array(
-                'Content-Type' => 'application/json'
+        // Guardar en la base de datos
+        global $wpdb;
+        $config_table = $wpdb->prefix . 'condo360ws_config';
+        
+        $result = $wpdb->replace(
+            $config_table,
+            array(
+                'config_key' => 'whatsapp_group_id',
+                'config_value' => $group_id,
+                'updated_at' => current_time('mysql')
             ),
-            'body' => json_encode(array(
-                'groupId' => $groupId,
-                'secretKey' => $this->api_secret
-            ))
-        ));
-        
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => __('Error configurando grupo', 'condo360ws'),
-                'error' => $response->get_error_message()
-            ));
-        }
-        
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        
-        if ($data && $data['success']) {
-            wp_send_json_success(array(
-                'message' => __('Grupo configurado correctamente', 'condo360ws'),
-                'groupId' => $data['groupId']
-            ));
-        } else {
-            wp_send_json_error(array(
-                'message' => __('Error configurando grupo', 'condo360ws'),
-                'error' => $data['error'] ?? 'Error desconocido'
-            ));
-        }
-    }
-
-    /**
-     * AJAX: Enviar mensaje
-     */
-    public function ajax_send_message() {
-        check_ajax_referer('condo360ws_nonce', 'nonce');
-        
-        if (!current_user_can('administrator')) {
-            wp_die(__('No tienes permisos para realizar esta acción', 'condo360ws'));
-        }
-        
-        $message = sanitize_textarea_field($_POST['message'] ?? '');
-        
-        if (empty($message)) {
-            wp_send_json_error(array(
-                'message' => __('El mensaje no puede estar vacío', 'condo360ws')
-            ));
-        }
-        
-        $response = wp_remote_post($this->api_url . '/api/send-message', array(
-            'timeout' => 30,
-            'headers' => array(
-                'Content-Type' => 'application/json'
-            ),
-            'body' => json_encode(array(
-                'message' => $message,
-                'secretKey' => $this->api_secret
-            ))
-        ));
-        
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => __('Error enviando mensaje', 'condo360ws'),
-                'error' => $response->get_error_message()
-            ));
-        }
-        
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-        
-        if ($data && $data['success']) {
-            wp_send_json_success(array(
-                'message' => __('Mensaje enviado correctamente', 'condo360ws'),
-                'messageId' => $data['messageId'] ?? null
-            ));
-        } else {
-            wp_send_json_error(array(
-                'message' => __('Error enviando mensaje', 'condo360ws'),
-                'error' => $data['error'] ?? 'Error desconocido'
-            ));
-        }
-    }
-    
-    /**
-     * Agregar menú de administración
-     */
-    public function add_admin_menu() {
-        add_options_page(
-            __('Condo360 WhatsApp', 'condo360ws'),
-            __('WhatsApp Service', 'condo360ws'),
-            'manage_options',
-            'condo360ws-settings',
-            array($this, 'admin_page')
+            array('%s', '%s', '%s')
         );
-    }
-    
-    /**
-     * Página de administración
-     */
-    public function admin_page() {
-        if (isset($_POST['submit'])) {
-            update_option('condo360ws_api_url', sanitize_url($_POST['api_url']));
-            update_option('condo360ws_api_secret', sanitize_text_field($_POST['api_secret']));
-            echo '<div class="notice notice-success"><p>' . __('Configuración guardada', 'condo360ws') . '</p></div>';
-        }
         
-        $api_url = get_option('condo360ws_api_url', 'https://wschat.bonaventurecclub.com');
-        $api_secret = get_option('condo360ws_api_secret', 'condo360_whatsapp_secret_2025');
-        ?>
-        <div class="wrap">
-            <h1><?php _e('Configuración de Condo360 WhatsApp Service', 'condo360ws'); ?></h1>
-            
-            <form method="post" action="">
-                <table class="form-table">
-                    <tr>
-                        <th scope="row"><?php _e('URL del API', 'condo360ws'); ?></th>
-                        <td>
-                            <input type="url" name="api_url" value="<?php echo esc_attr($api_url); ?>" class="regular-text" />
-                            <p class="description"><?php _e('URL base del servicio de WhatsApp (ej: https://wschat.bonaventurecclub.com)', 'condo360ws'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><?php _e('Clave Secreta del API', 'condo360ws'); ?></th>
-                        <td>
-                            <input type="text" name="api_secret" value="<?php echo esc_attr($api_secret); ?>" class="regular-text" />
-                            <p class="description"><?php _e('Clave secreta para autenticar las peticiones al API', 'condo360ws'); ?></p>
-                        </td>
-                    </tr>
-                </table>
-                
-                <?php submit_button(); ?>
-            </form>
-            
-            <h2><?php _e('Uso del Shortcode', 'condo360ws'); ?></h2>
-            <p><?php _e('Usa el shortcode <code>[wa_connect_qr]</code> en cualquier página o entrada para mostrar el estado de WhatsApp y el código QR.', 'condo360ws'); ?></p>
-            
-            <h3><?php _e('Parámetros disponibles:', 'condo360ws'); ?></h3>
-            <ul>
-                <li><code>show_status="true"</code> - <?php _e('Mostrar estado de conexión', 'condo360ws'); ?></li>
-                <li><code>auto_refresh="true"</code> - <?php _e('Actualizar automáticamente', 'condo360ws'); ?></li>
-                <li><code>refresh_interval="10000"</code> - <?php _e('Intervalo de actualización en milisegundos', 'condo360ws'); ?></li>
-            </ul>
-            
-            <h3><?php _e('Ejemplo:', 'condo360ws'); ?></h3>
-            <code>[wa_connect_qr show_status="true" auto_refresh="true" refresh_interval="10000"]</code>
-        </div>
-        <?php
+        if ($result !== false) {
+            wp_send_json_success(array(
+                'message' => 'Grupo seleccionado correctamente',
+                'group_id' => $group_id
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => 'Error guardando grupo en base de datos'
+            ));
+        }
     }
     
     /**
@@ -563,4 +514,4 @@ class Condo360WhatsAppPlugin {
 }
 
 // Inicializar plugin
-new Condo360WhatsAppPlugin();
+new Condo360WhatsAppPluginDirectTest();
