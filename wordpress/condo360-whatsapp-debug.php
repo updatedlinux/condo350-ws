@@ -212,6 +212,160 @@ class Condo360WhatsAppPlugin {
         
         <script>
         jQuery(document).ready(function($) {
+            var updateInterval;
+            var isConnected = <?php echo $api_status['connected'] ? 'true' : 'false'; ?>;
+            var isQRGenerated = <?php echo $api_status['qrGenerated'] ? 'true' : 'false'; ?>;
+            
+            // Función para verificar estado del API
+            function checkAPIStatus() {
+                $.ajax({
+                    url: condo360ws_ajax.api_url + '/api/status',
+                    type: 'GET',
+                    timeout: 10000,
+                    success: function(response) {
+                        if (response.success) {
+                            var newConnected = response.data.connected;
+                            var newQRGenerated = response.data.qrGenerated;
+                            
+                            // Si cambió el estado de conexión
+                            if (newConnected !== isConnected) {
+                                isConnected = newConnected;
+                                updateUI();
+                                
+                                if (isConnected) {
+                                    // Conectó - cargar grupos automáticamente
+                                    setTimeout(loadGroups, 1000);
+                                }
+                            }
+                            
+                            // Si cambió el estado del QR
+                            if (newQRGenerated !== isQRGenerated) {
+                                isQRGenerated = newQRGenerated;
+                                updateUI();
+                            }
+                            
+                            // Actualizar timestamp
+                            $('.last-updated').text('Última actualización: ' + new Date().toLocaleTimeString());
+                        }
+                    },
+                    error: function() {
+                        // Silenciar errores de conexión
+                    }
+                });
+            }
+            
+            // Función para actualizar la UI según el estado
+            function updateUI() {
+                if (isConnected) {
+                    // Mostrar estado conectado
+                    $('.status-dot').removeClass('disconnected').addClass('connected');
+                    $('.status-text').text('WhatsApp Conectado');
+                    $('.condo360ws-content').html(`
+                        <div class="condo360ws-connected">
+                            <div class="success-icon">✓</div>
+                            <h4>WhatsApp Conectado</h4>
+                            <p>El servicio de WhatsApp está funcionando correctamente.</p>
+                            
+                            <div id="groups-section" style="margin-top: 20px;">
+                                <h5>Gestión de Grupos</h5>
+                                <button type="button" id="load-groups-btn" class="btn-primary">
+                                    Cargar Grupos
+                                </button>
+                                <div id="groups-loading" class="loading-spinner" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p>Cargando grupos...</p>
+                                </div>
+                                <div id="groups-list" style="display: none;">
+                                    <!-- Los grupos se cargarán aquí -->
+                                </div>
+                                <div id="selected-group" class="selected-group" style="display: none;">
+                                    <h6>Grupo Seleccionado:</h6>
+                                    <div id="selected-group-info"></div>
+                                    <button type="button" id="set-group-btn" class="btn-success">
+                                        Configurar como Grupo de Destino
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 20px;">
+                                <button type="button" id="disconnect-btn" class="btn-danger">
+                                    Desconectar WhatsApp
+                                </button>
+                            </div>
+                        </div>
+                    `);
+                    
+                    // Reconfigurar eventos
+                    setupEventHandlers();
+                    
+                } else if (isQRGenerated) {
+                    // Mostrar QR
+                    loadQRCode();
+                } else {
+                    // Mostrar estado de espera
+                    $('.status-dot').removeClass('connected').addClass('disconnected');
+                    $('.status-text').text('WhatsApp Desconectado');
+                    $('.condo360ws-content').html(`
+                        <div class="condo360ws-waiting">
+                            <div class="waiting-icon">⏳</div>
+                            <h4>Iniciando WhatsApp</h4>
+                            <p>Esperando conexión...</p>
+                        </div>
+                    `);
+                }
+            }
+            
+            // Función para cargar el código QR
+            function loadQRCode() {
+                $('.status-dot').removeClass('connected').addClass('disconnected');
+                $('.status-text').text('WhatsApp Desconectado');
+                
+                $.ajax({
+                    url: condo360ws_ajax.api_url + '/api/qr',
+                    type: 'GET',
+                    timeout: 10000,
+                    success: function(response) {
+                        if (response.success && response.qr) {
+                            $('.condo360ws-content').html(`
+                                <div class="condo360ws-qr">
+                                    <h4>Conectar WhatsApp</h4>
+                                    <p>Escanea este código QR con WhatsApp para conectar:</p>
+                                    <div class="qr-code-wrapper">
+                                        <img src="data:image/png;base64,${response.qr}" alt="Código QR de WhatsApp" />
+                                    </div>
+                                    <div class="qr-instructions">
+                                        <p><strong>Instrucciones:</strong></p>
+                                        <ol>
+                                            <li>Abre WhatsApp en tu teléfono</li>
+                                            <li>Ve a Configuración > Dispositivos vinculados</li>
+                                            <li>Toca "Vincular un dispositivo"</li>
+                                            <li>Escanea este código QR</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            $('.condo360ws-content').html(`
+                                <div class="condo360ws-waiting">
+                                    <div class="waiting-icon">⏳</div>
+                                    <h4>Generando QR</h4>
+                                    <p>Esperando código QR...</p>
+                                </div>
+                            `);
+                        }
+                    },
+                    error: function() {
+                        $('.condo360ws-content').html(`
+                            <div class="condo360ws-waiting">
+                                <div class="waiting-icon">⏳</div>
+                                <h4>Generando QR</h4>
+                                <p>Esperando código QR...</p>
+                            </div>
+                        `);
+                    }
+                });
+            }
+            
             // Función para cargar grupos
             function loadGroups() {
                 $('#load-groups-btn').prop('disabled', true).text('Cargando...');
@@ -362,10 +516,7 @@ class Condo360WhatsAppPlugin {
                     success: function(response) {
                         if (response.success) {
                             alert('WhatsApp desconectado correctamente. Se generará un nuevo QR.');
-                            // Recargar después de 5 segundos para mostrar el nuevo QR
-                            setTimeout(function() {
-                                location.reload();
-                            }, 5000);
+                            // No recargar página - la actualización automática se encargará
                         } else {
                             alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }
@@ -379,15 +530,42 @@ class Condo360WhatsAppPlugin {
                 });
             }
             
-            // Eventos
-            $('#load-groups-btn').on('click', loadGroups);
-            $('#set-group-btn').on('click', setGroup);
-            $('#disconnect-btn').on('click', disconnectWhatsApp);
+            // Función para configurar eventos
+            function setupEventHandlers() {
+                // Remover eventos anteriores
+                $(document).off('click', '#load-groups-btn');
+                $(document).off('click', '#set-group-btn');
+                $(document).off('click', '#disconnect-btn');
+                
+                // Agregar eventos nuevos
+                $(document).on('click', '#load-groups-btn', loadGroups);
+                $(document).on('click', '#set-group-btn', setGroup);
+                $(document).on('click', '#disconnect-btn', disconnectWhatsApp);
+            }
             
-            // Cargar grupos automáticamente si WhatsApp está conectado
-            <?php if ($api_status['connected']): ?>
-                loadGroups();
-            <?php endif; ?>
+            // Inicializar
+            function init() {
+                // Configurar eventos iniciales
+                setupEventHandlers();
+                
+                // Iniciar verificación automática cada 3 segundos
+                updateInterval = setInterval(checkAPIStatus, 3000);
+                
+                // Cargar grupos automáticamente si WhatsApp está conectado
+                if (isConnected) {
+                    setTimeout(loadGroups, 1000);
+                }
+            }
+            
+            // Limpiar intervalo al salir
+            $(window).on('beforeunload', function() {
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                }
+            });
+            
+            // Inicializar
+            init();
         });
         </script>
         
