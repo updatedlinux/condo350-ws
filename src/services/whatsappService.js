@@ -28,13 +28,24 @@ class WhatsAppService {
         try {
             logger.info('Configurando cliente de WhatsApp...');
             
-            // Crear directorio de sesiones si no existe
-            this.ensureSessionDirectory();
+            // Generar directorio de sesión único con timestamp
+            const timestamp = Date.now();
+            const uniqueSessionPath = path.join(__dirname, '../../sessions', `session-${timestamp}`);
+            
+            // Crear directorio único si no existe
+            if (!fs.existsSync(uniqueSessionPath)) {
+                fs.mkdirSync(uniqueSessionPath, { recursive: true });
+            }
+            
+            logger.info(`Directorio de sesiones: ${uniqueSessionPath}`);
+
+            // Limpiar sesiones antiguas
+            this.cleanupOldSessions();
 
             this.client = new Client({
                 authStrategy: new LocalAuth({
                     clientId: 'condo360-whatsapp',
-                    dataPath: this.sessionPath
+                    dataPath: uniqueSessionPath
                 }),
                 puppeteer: {
                     headless: true,
@@ -329,6 +340,42 @@ class WhatsAppService {
     }
 
     /**
+     * Limpia directorios de sesión antiguos (más de 1 hora)
+     */
+    cleanupOldSessions() {
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const sessionsBasePath = path.join(__dirname, '../../sessions');
+            
+            if (!fs.existsSync(sessionsBasePath)) {
+                return;
+            }
+            
+            const dirs = fs.readdirSync(sessionsBasePath);
+            const oneHourAgo = Date.now() - (60 * 60 * 1000);
+            
+            for (const dir of dirs) {
+                if (dir.startsWith('session-')) {
+                    const dirPath = path.join(sessionsBasePath, dir);
+                    const stats = fs.statSync(dirPath);
+                    
+                    if (stats.isDirectory() && stats.mtime.getTime() < oneHourAgo) {
+                        try {
+                            fs.rmSync(dirPath, { recursive: true, force: true });
+                            logger.info(`Directorio de sesión antiguo eliminado: ${dir}`);
+                        } catch (err) {
+                            logger.warn(`No se pudo eliminar directorio antiguo: ${dir}`);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            logger.error('Error limpiando sesiones antiguas:', error);
+        }
+    }
+    
+    /**
      * Cierra la conexión de WhatsApp y limpia la sesión
      */
     async destroy() {
@@ -344,23 +391,7 @@ class WhatsAppService {
             this.qrCode = null;
             this.client = null;
             
-            // Limpiar archivos de sesión
-            const fs = require('fs');
-            const path = require('path');
-            const sessionPath = path.join(__dirname, '../../sessions');
-            
-            if (fs.existsSync(sessionPath)) {
-                const files = fs.readdirSync(sessionPath);
-                for (const file of files) {
-                    const filePath = path.join(sessionPath, file);
-                    try {
-                        fs.unlinkSync(filePath);
-                        logger.info(`Archivo de sesión eliminado: ${file}`);
-                    } catch (err) {
-                        logger.warn(`No se pudo eliminar archivo de sesión: ${file}`);
-                    }
-                }
-            }
+            logger.info('Estado de WhatsApp limpiado');
             
         } catch (error) {
             logger.error('Error cerrando cliente:', error);
