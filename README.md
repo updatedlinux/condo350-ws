@@ -42,7 +42,7 @@ npm start
 ### 2. Plugin WordPress
 
 1. Sube la carpeta `wordpress/` a `/wp-content/plugins/condo360-whatsapp/`
-2. Activa el plugin "Condo360 WhatsApp Service" en WordPress
+2. Activa el plugin "Condo360 WhatsApp Service (Debug)" en WordPress
 3. Usa el shortcode `[wa_connect_qr]` en cualquier página
 
 ## ⚙️ Configuración

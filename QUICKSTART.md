@@ -12,8 +12,8 @@ El plugin ha sido mejorado y está listo para usar. Incluye:
 ## 📋 Pasos para Usar
 
 ### 1. Instalar Plugin
-1. Sube `wordpress/condo360-whatsapp.php` a `/wp-content/plugins/condo360-whatsapp/`
-2. Activa el plugin "Condo360 WhatsApp Service" en WordPress
+1. Sube `wordpress/condo360-whatsapp-debug.php` a `/wp-content/plugins/condo360-whatsapp/`
+2. Activa el plugin "Condo360 WhatsApp Service (Debug)" en WordPress
 3. El plugin está listo para usar
 
 ### 2. Conectar WhatsApp

@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: Condo360 WhatsApp Service
+ * Plugin Name: Condo360 WhatsApp Service (Debug)
  * Plugin URI: https://bonaventurecclub.com
- * Description: Plugin para conectar WhatsApp con el servicio Condo360 usando QR y gestionar grupos.
- * Version: 1.0.0
+ * Description: Plugin para conectar WhatsApp con el servicio Condo360 usando QR y gestionar grupos - VERSIÓN DEBUG.
+ * Version: 1.0.0-debug
  * Author: Condo360
  * Author URI: https://bonaventurecclub.com
  * License: GPL v2 or later
