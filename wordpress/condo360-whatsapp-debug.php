@@ -40,6 +40,8 @@ class Condo360WhatsAppPluginDebug {
         // Solo agregar hooks esenciales
         add_action('init', array($this, 'init'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_action('wp_ajax_condo360ws_get_groups', array($this, 'ajax_get_groups'));
+        add_action('wp_ajax_condo360ws_set_group_db', array($this, 'ajax_set_group_db'));
         
         // Shortcode simple
         add_shortcode('wa_connect_qr', array($this, 'shortcode_wa_connect_qr'));
@@ -130,7 +132,26 @@ class Condo360WhatsAppPluginDebug {
                         <?php if ($api_test['data']['connected']): ?>
                             <div style="margin-top: 20px; padding: 15px; background: #e8f5e8; border-radius: 4px;">
                                 <strong>WhatsApp está conectado</strong>
-                                <p>Los grupos se cargarán automáticamente cuando esté listo.</p>
+                                <div id="groups-section" style="margin-top: 15px;">
+                                    <h5>Grupos Disponibles:</h5>
+                                    <button type="button" id="load-groups-btn" style="background: #007cba; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-bottom: 15px;">
+                                        Cargar Grupos
+                                    </button>
+                                    <div id="groups-loading" style="text-align: center; padding: 20px; display: none;">
+                                        <div style="border: 3px solid #f3f3f3; border-top: 3px solid #007cba; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px;"></div>
+                                        <p>Cargando grupos...</p>
+                                    </div>
+                                    <div id="groups-list" style="display: none;">
+                                        <!-- Los grupos se cargarán aquí -->
+                                    </div>
+                                    <div id="selected-group" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 4px; display: none;">
+                                        <h6>Grupo Seleccionado:</h6>
+                                        <div id="selected-group-info"></div>
+                                        <button type="button" id="set-group-btn" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 10px;">
+                                            Configurar como Grupo de Destino
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         <?php elseif ($api_test['data']['qrGenerated']): ?>
                             <div style="margin-top: 20px;">
@@ -200,6 +221,138 @@ class Condo360WhatsAppPluginDebug {
                 <?php endif; ?>
             </div>
         </div>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // Función para cargar grupos
+            function loadGroups() {
+                $('#load-groups-btn').prop('disabled', true).text('Cargando...');
+                $('#groups-loading').show();
+                $('#groups-list').hide();
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'condo360ws_get_groups',
+                        nonce: '<?php echo wp_create_nonce('condo360ws_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        $('#groups-loading').hide();
+                        
+                        if (response.success && response.data.groups) {
+                            displayGroups(response.data.groups);
+                        } else {
+                            $('#groups-list').html('<p style="color: red;">Error cargando grupos: ' + (response.data || 'Error desconocido') + '</p>').show();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $('#groups-loading').hide();
+                        $('#groups-list').html('<p style="color: red;">Error AJAX: ' + error + '</p>').show();
+                    },
+                    complete: function() {
+                        $('#load-groups-btn').prop('disabled', false).text('Cargar Grupos');
+                    }
+                });
+            }
+            
+            // Función para mostrar grupos
+            function displayGroups(groups) {
+                var html = '<div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">';
+                
+                if (groups.length === 0) {
+                    html += '<p style="padding: 20px; text-align: center; color: #666;">No se encontraron grupos.</p>';
+                } else {
+                    html += '<p style="padding: 15px; margin: 0; background: #f8f9fa; border-bottom: 1px solid #ddd;">Selecciona un grupo para enviar mensajes:</p>';
+                    
+                    groups.forEach(function(group) {
+                        html += '<div class="group-item" data-group-id="' + group.id + '" style="padding: 12px 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.3s;" onmouseover="this.style.background=\'#f9f9f9\'" onmouseout="this.style.background=\'#fff\'">';
+                        html += '<div style="font-weight: bold; color: #333; margin-bottom: 5px;">' + group.subject + '</div>';
+                        html += '<div style="font-size: 12px; color: #666; font-family: monospace; background: #f5f5f5; padding: 4px 8px; border-radius: 3px; margin-bottom: 5px;">ID: ' + group.id + '</div>';
+                        html += '<div style="font-size: 12px; color: #666;">' + group.participants + ' participantes</div>';
+                        html += '</div>';
+                    });
+                }
+                
+                html += '</div>';
+                
+                $('#groups-list').html(html).show();
+                
+                // Agregar evento click a los grupos
+                $('.group-item').on('click', function() {
+                    // Remover selección anterior
+                    $('.group-item').css('background', '#fff');
+                    
+                    // Seleccionar grupo actual
+                    $(this).css('background', '#e3f2fd');
+                    
+                    var groupId = $(this).data('group-id');
+                    var groupName = $(this).find('div:first').text();
+                    
+                    // Mostrar información del grupo seleccionado
+                    $('#selected-group-info').html(
+                        '<div style="font-weight: bold; color: #333; margin-bottom: 5px;">' + groupName + '</div>' +
+                        '<div style="font-size: 12px; color: #666; font-family: monospace; background: #e9ecef; padding: 4px 8px; border-radius: 3px;">ID: ' + groupId + '</div>'
+                    );
+                    $('#selected-group').show();
+                });
+            }
+            
+            // Función para configurar grupo
+            function setGroup() {
+                var groupId = $('#selected-group-info').find('div:last').text().replace('ID: ', '');
+                var groupName = $('#selected-group-info').find('div:first').text();
+                
+                if (!groupId) {
+                    alert('No hay grupo seleccionado');
+                    return;
+                }
+                
+                $('#set-group-btn').prop('disabled', true).text('Configurando...');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'condo360ws_set_group_db',
+                        group_id: groupId,
+                        group_name: groupName,
+                        nonce: '<?php echo wp_create_nonce('condo360ws_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Grupo "' + groupName + '" configurado correctamente como destino.\nID: ' + groupId);
+                            location.reload();
+                        } else {
+                            alert('Error configurando grupo: ' + (response.data || 'Error desconocido'));
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('Error AJAX: ' + error);
+                    },
+                    complete: function() {
+                        $('#set-group-btn').prop('disabled', false).text('Configurar como Grupo de Destino');
+                    }
+                });
+            }
+            
+            // Eventos
+            $('#load-groups-btn').on('click', loadGroups);
+            $('#set-group-btn').on('click', setGroup);
+            
+            // Cargar grupos automáticamente si WhatsApp está conectado
+            <?php if ($api_test['success'] && $api_test['data']['connected']): ?>
+                loadGroups();
+            <?php endif; ?>
+        });
+        </script>
+        
+        <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        </style>
         <?php
         return ob_get_clean();
     }
@@ -290,6 +443,96 @@ class Condo360WhatsAppPluginDebug {
         }
         
         return false;
+    }
+    
+    /**
+     * AJAX: Obtener grupos de WhatsApp
+     */
+    public function ajax_get_groups() {
+        check_ajax_referer('condo360ws_nonce', 'nonce');
+        
+        if (!current_user_can('administrator')) {
+            wp_die('No tienes permisos para realizar esta acción');
+        }
+        
+        $response = wp_remote_get($this->api_url . '/api/groups', array(
+            'timeout' => 30,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'User-Agent' => 'WordPress/' . get_bloginfo('version') . '; ' . home_url()
+            )
+        ));
+        
+        if (is_wp_error($response)) {
+            wp_send_json_error(array(
+                'message' => 'Error obteniendo grupos de WhatsApp: ' . $response->get_error_message()
+            ));
+        }
+        
+        $http_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        
+        if ($http_code !== 200) {
+            wp_send_json_error(array(
+                'message' => "HTTP Error $http_code: " . $body
+            ));
+        }
+        
+        $data = json_decode($body, true);
+        
+        if ($data && $data['success']) {
+            wp_send_json_success(array('groups' => $data['data']));
+        } else {
+            wp_send_json_error(array(
+                'message' => 'Error obteniendo grupos: ' . ($data['error'] ?? 'Error desconocido')
+            ));
+        }
+    }
+    
+    /**
+     * AJAX: Guardar grupo seleccionado en base de datos
+     */
+    public function ajax_set_group_db() {
+        check_ajax_referer('condo360ws_nonce', 'nonce');
+        
+        if (!current_user_can('administrator')) {
+            wp_die('No tienes permisos para realizar esta acción');
+        }
+        
+        $group_id = sanitize_text_field($_POST['group_id'] ?? '');
+        $group_name = sanitize_text_field($_POST['group_name'] ?? '');
+        
+        if (empty($group_id)) {
+            wp_send_json_error(array(
+                'message' => 'ID de grupo requerido'
+            ));
+        }
+        
+        // Guardar en la base de datos
+        global $wpdb;
+        $config_table = $wpdb->prefix . 'condo360ws_config';
+        
+        $result = $wpdb->replace(
+            $config_table,
+            array(
+                'config_key' => 'whatsapp_group_id',
+                'config_value' => $group_id,
+                'updated_at' => current_time('mysql')
+            ),
+            array('%s', '%s', '%s')
+        );
+        
+        if ($result !== false) {
+            wp_send_json_success(array(
+                'message' => 'Grupo seleccionado correctamente',
+                'group_id' => $group_id,
+                'group_name' => $group_name
+            ));
+        } else {
+            wp_send_json_error(array(
+                'message' => 'Error guardando grupo en base de datos'
+            ));
+        }
     }
     
     /**
