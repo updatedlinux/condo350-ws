@@ -551,7 +551,10 @@ class Condo360WhatsAppPlugin {
                     $(this).css('background', '#e3f2fd');
                     
                     var groupId = $(this).data('group-id');
-                    var groupName = $(this).find('div:first').text();
+                    var groupName = $(this).find('div:first div:first').text(); // Obtener solo el nombre del grupo
+                    
+                    // Debug logging
+                    console.log('Condo360 Debug: Grupo seleccionado - ID:', groupId, 'Nombre:', groupName);
                     
                     // Mostrar información del grupo seleccionado
                     $('#selected-group-info').html(
@@ -564,11 +567,23 @@ class Condo360WhatsAppPlugin {
             
             // Función para configurar grupo
             function setGroup() {
-                var groupId = $('#selected-group-info').find('div:last').text().replace('ID: ', '');
-                var groupName = $('#selected-group-info').find('div:first').text();
+                // Extraer datos de manera más robusta
+                var groupIdElement = $('#selected-group-info').find('div:last');
+                var groupNameElement = $('#selected-group-info').find('div:first');
                 
-                if (!groupId) {
-                    alert('No hay grupo seleccionado');
+                var groupId = groupIdElement.text().replace('ID: ', '').trim();
+                var groupName = groupNameElement.text().trim();
+                
+                // Debug logging
+                console.log('Condo360 Debug: groupId extraído:', groupId);
+                console.log('Condo360 Debug: groupName extraído:', groupName);
+                console.log('Condo360 Debug: HTML del selected-group-info:', $('#selected-group-info').html());
+                console.log('Condo360 Debug: Elemento groupId:', groupIdElement);
+                console.log('Condo360 Debug: Elemento groupName:', groupNameElement);
+                
+                if (!groupId || groupId === '') {
+                    alert('No hay grupo seleccionado o el ID está vacío');
+                    console.error('Condo360 Debug: groupId está vacío o indefinido');
                     return;
                 }
                 
@@ -583,16 +598,27 @@ class Condo360WhatsAppPlugin {
                         group_name: groupName,
                         nonce: condo360ws_ajax.nonce
                     },
+                    beforeSend: function() {
+                        console.log('Condo360 Debug: Enviando datos:', {
+                            action: 'condo360ws_set_group_db',
+                            group_id: groupId,
+                            group_name: groupName,
+                            nonce: condo360ws_ajax.nonce
+                        });
+                    },
                     success: function(response) {
+                        console.log('Condo360 Debug: Respuesta del servidor:', response);
                         if (response.success) {
                             alert('Grupo "' + groupName + '" configurado correctamente como destino.\nID: ' + groupId);
                             location.reload();
                         } else {
+                            console.error('Condo360 Debug: Error en respuesta:', response);
                             alert('Error configurando grupo: ' + (response.data || 'Error desconocido'));
                         }
                     },
                     error: function(xhr, status, error) {
-                        alert('Error AJAX: ' + error);
+                        console.error('Condo360 Debug: Error AJAX:', {xhr: xhr, status: status, error: error});
+                        alert('Error AJAX configurando grupo: ' + error);
                     },
                     complete: function() {
                         $('#set-group-btn').prop('disabled', false).text('Configurar como Grupo de Destino');
@@ -1113,8 +1139,13 @@ class Condo360WhatsAppPlugin {
         $group_id = sanitize_text_field($_POST['group_id'] ?? '');
         $group_name = sanitize_text_field($_POST['group_name'] ?? '');
         
+        // Debug logging
+        error_log("Condo360 Debug: group_id recibido: " . var_export($group_id, true));
+        error_log("Condo360 Debug: group_name recibido: " . var_export($group_name, true));
+        error_log("Condo360 Debug: POST completo: " . var_export($_POST, true));
         
         if (empty($group_id)) {
+            error_log("Condo360 Debug: group_id está vacío, enviando error");
             wp_send_json_error(array(
                 'message' => 'ID de grupo requerido'
             ));
