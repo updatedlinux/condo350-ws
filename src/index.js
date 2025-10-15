@@ -67,17 +67,31 @@ class Condo360WhatsAppService {
      * Configura las rutas de la API
      */
     setupRoutes() {
-        // Health check
-        this.app.get('/health', (req, res) => {
-            res.json({
-                status: 'ok',
-                timestamp: new Date().toISOString(),
-                uptime: process.uptime(),
-                whatsapp: {
-                    connected: this.whatsappService.isConnected(),
-                    qrGenerated: this.whatsappService.isQRGenerated
-                }
-            });
+        // Health check con información de base de datos
+        this.app.get('/api/health', async (req, res) => {
+            try {
+                const dbHealth = await this.databaseService.healthCheck();
+                const configuredGroup = await this.databaseService.getConfiguredGroup();
+                
+                res.json({
+                    status: 'ok',
+                    timestamp: new Date().toISOString(),
+                    uptime: process.uptime(),
+                    database: dbHealth,
+                    whatsapp: {
+                        connected: this.whatsappService.isConnected(),
+                        qrGenerated: this.whatsappService.isQRGenerated
+                    },
+                    configuredGroup: configuredGroup
+                });
+            } catch (error) {
+                logger.error('Error en health check:', error);
+                res.status(500).json({
+                    status: 'error',
+                    timestamp: new Date().toISOString(),
+                    error: error.message
+                });
+            }
         });
 
         // Obtener estado de conexión
@@ -287,7 +301,7 @@ class Condo360WhatsAppService {
         // Configurar grupo de destino
         this.app.post('/api/set-group', async (req, res) => {
             try {
-                const { groupId, secretKey } = req.body;
+                const { groupId, groupName, secretKey } = req.body;
 
                 if (secretKey !== process.env.API_SECRET_KEY) {
                     return res.status(401).json({
@@ -303,8 +317,8 @@ class Condo360WhatsAppService {
                     });
                 }
 
-                // Guardar en base de datos
-                await this.databaseService.setGroupId(groupId);
+                // Guardar en base de datos (ID y nombre)
+                await this.databaseService.setGroupId(groupId, groupName);
                 
                 // Actualizar variable de entorno
                 process.env.WHATSAPP_GROUP_ID = groupId;
@@ -312,7 +326,8 @@ class Condo360WhatsAppService {
                 res.json({
                     success: true,
                     message: 'Grupo configurado correctamente',
-                    groupId
+                    groupId,
+                    groupName: groupName || 'Sin nombre'
                 });
 
             } catch (error) {

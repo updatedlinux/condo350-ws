@@ -1140,6 +1140,19 @@ class Condo360WhatsAppPlugin {
             array('%s', '%s', '%s')
         );
         
+        // También guardar el nombre del grupo
+        if ($result !== false && !empty($group_name)) {
+            $wpdb->replace(
+                $config_table,
+                array(
+                    'config_key' => 'whatsapp_group_name',
+                    'config_value' => $group_name,
+                    'updated_at' => current_time('mysql')
+                ),
+                array('%s', '%s', '%s')
+            );
+        }
+        
         if ($result !== false) {
             // Verificar que se guardó correctamente
             $saved_value = $wpdb->get_var($wpdb->prepare(

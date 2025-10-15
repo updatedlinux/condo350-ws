@@ -141,14 +141,22 @@ class DatabaseService {
     /**
      * Configura el ID del grupo de WhatsApp
      */
-    async setGroupId(groupId) {
+    async setGroupId(groupId, groupName = null) {
         try {
             await this.connection.execute(
                 'INSERT INTO condo360ws_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = CURRENT_TIMESTAMP',
                 ['whatsapp_group_id', groupId, groupId]
             );
 
-            logger.info(`Grupo ID configurado: ${groupId}`);
+            // Si se proporciona el nombre del grupo, también guardarlo
+            if (groupName) {
+                await this.connection.execute(
+                    'INSERT INTO condo360ws_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = CURRENT_TIMESTAMP',
+                    ['whatsapp_group_name', groupName, groupName]
+                );
+            }
+
+            logger.info(`Grupo ID configurado: ${groupId}${groupName ? ` (${groupName})` : ''}`);
             return true;
         } catch (error) {
             logger.error('Error configurando grupo ID:', error);
@@ -293,7 +301,7 @@ class DatabaseService {
         try {
             // Buscar en la tabla de configuración de WordPress
             const [rows] = await this.connection.execute(
-                'SELECT config_value, updated_at FROM wp_condo360ws_config WHERE config_key = ?',
+                'SELECT config_value, updated_at FROM condo360ws_config WHERE config_key = ?',
                 ['whatsapp_group_id']
             );
 
@@ -301,14 +309,27 @@ class DatabaseService {
                 const groupId = rows[0].config_value;
                 const configuredAt = rows[0].updated_at;
                 
-                // Intentar obtener el nombre del grupo desde los logs de mensajes
+                // Intentar obtener el nombre del grupo desde la tabla de configuración
                 try {
                     const [nameRows] = await this.connection.execute(
-                        'SELECT group_name FROM condo360ws_messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
-                        [groupId]
+                        'SELECT config_value FROM condo360ws_config WHERE config_key = ?',
+                        ['whatsapp_group_name']
                     );
                     
-                    const groupName = nameRows.length > 0 ? nameRows[0].group_name : 'Grupo desconocido';
+                    let groupName = 'Grupo desconocido';
+                    if (nameRows.length > 0 && nameRows[0].config_value) {
+                        groupName = nameRows[0].config_value;
+                    } else {
+                        // Fallback: buscar en logs de mensajes
+                        const [messageRows] = await this.connection.execute(
+                            'SELECT group_name FROM condo360ws_messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
+                            [groupId]
+                        );
+                        
+                        if (messageRows.length > 0 && messageRows[0].group_name) {
+                            groupName = messageRows[0].group_name;
+                        }
+                    }
                     
                     return {
                         groupId,
