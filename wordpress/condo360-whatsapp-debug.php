@@ -44,7 +44,7 @@ class Condo360WhatsAppPlugin {
         add_action('init', array($this, 'init'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('wp_ajax_condo360ws_get_groups', array($this, 'ajax_get_groups'));
-        add_action('wp_ajax_condo360ws_set_group_db', array($this, 'ajax_set_group_db'));
+        // Removed: wp_ajax_condo360ws_set_group_db - ahora usamos API Node.js directamente
         add_action('wp_ajax_condo360ws_disconnect', array($this, 'ajax_disconnect'));
         
         // Shortcode principal
@@ -590,30 +590,32 @@ class Condo360WhatsAppPlugin {
                 $('#set-group-btn').prop('disabled', true).text('Configurando...');
                 
                 $.ajax({
-                    url: condo360ws_ajax.ajax_url,
+                    url: condo360ws_ajax.api_url + '/api/set-group',
                     type: 'POST',
-                    data: {
-                        action: 'condo360ws_set_group_db',
-                        group_id: groupId,
-                        group_name: groupName,
-                        nonce: condo360ws_ajax.nonce
+                    headers: {
+                        'Content-Type': 'application/json'
                     },
+                    data: JSON.stringify({
+                        groupId: groupId,
+                        groupName: groupName,
+                        secretKey: 'condo360_whatsapp_secret_2025'
+                    }),
                     beforeSend: function() {
-                        console.log('Condo360 Debug: Enviando datos:', {
-                            action: 'condo360ws_set_group_db',
-                            group_id: groupId,
-                            group_name: groupName,
-                            nonce: condo360ws_ajax.nonce
+                        console.log('Condo360 Debug: Enviando datos al API Node.js:', {
+                            groupId: groupId,
+                            groupName: groupName,
+                            secretKey: 'condo360_whatsapp_secret_2025'
                         });
                     },
                     success: function(response) {
-                        console.log('Condo360 Debug: Respuesta del servidor:', response);
+                        console.log('Condo360 Debug: Respuesta del API Node.js:', response);
                         if (response.success) {
-                            alert('Grupo "' + groupName + '" configurado correctamente como destino.\nID: ' + groupId);
-                            location.reload();
+                            alert('✅ Grupo "' + groupName + '" configurado correctamente como destino.\n\nID: ' + groupId + '\n\nEl grupo ya está listo para recibir mensajes.');
+                            // Actualizar UI para mostrar el grupo configurado
+                            updateUI();
                         } else {
                             console.error('Condo360 Debug: Error en respuesta:', response);
-                            alert('Error configurando grupo: ' + (response.data || 'Error desconocido'));
+                            alert('❌ Error configurando grupo: ' + (response.error || 'Error desconocido'));
                         }
                     },
                     error: function(xhr, status, error) {
@@ -1128,7 +1130,9 @@ class Condo360WhatsAppPlugin {
     
     /**
      * AJAX: Guardar grupo seleccionado en base de datos
+     * DEPRECATED: Ahora usamos API Node.js directamente
      */
+    /*
     public function ajax_set_group_db() {
         check_ajax_referer('condo360ws_nonce', 'nonce');
         
@@ -1205,6 +1209,7 @@ class Condo360WhatsAppPlugin {
             ));
         }
     }
+    */
     
     /**
      * AJAX: Desconectar WhatsApp
