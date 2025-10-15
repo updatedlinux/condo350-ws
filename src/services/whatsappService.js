@@ -9,13 +9,14 @@ const logger = require('../utils/logger');
  * Más estable que Baileys y con mejor mantenimiento
  */
 class WhatsAppService {
-    constructor() {
+    constructor(databaseService = null) {
         this.client = null;
         this._isConnected = false;
         this._isQRGenerated = false;
         this.qrCode = null;
         this.sessionPath = path.join(__dirname, '../../sessions');
         this.groupId = process.env.WHATSAPP_GROUP_ID || '';
+        this.databaseService = databaseService; // Referencia al servicio de base de datos
         
         // Configurar cliente con autenticación local
         this.setupClient();
@@ -128,17 +129,37 @@ class WhatsAppService {
         });
 
         // Cliente desconectado
-        this.client.on('disconnected', (reason) => {
+        this.client.on('disconnected', async (reason) => {
             logger.warn(`❌ WhatsApp desconectado: ${reason}`);
             this._isConnected = false;
             this.qrCode = null;
+            
+            // Limpiar configuración del grupo si hay databaseService disponible
+            if (this.databaseService) {
+                try {
+                    await this.databaseService.clearGroupConfiguration();
+                    logger.info('Configuración del grupo limpiada por desconexión automática');
+                } catch (error) {
+                    logger.error('Error limpiando configuración del grupo:', error);
+                }
+            }
         });
 
         // Error de autenticación
-        this.client.on('auth_failure', (msg) => {
+        this.client.on('auth_failure', async (msg) => {
             logger.error('❌ Error de autenticación:', msg);
             this._isConnected = false;
             this.qrCode = null;
+            
+            // Limpiar configuración del grupo si hay databaseService disponible
+            if (this.databaseService) {
+                try {
+                    await this.databaseService.clearGroupConfiguration();
+                    logger.info('Configuración del grupo limpiada por fallo de autenticación');
+                } catch (error) {
+                    logger.error('Error limpiando configuración del grupo:', error);
+                }
+            }
         });
 
         // Error general

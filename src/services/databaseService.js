@@ -376,6 +376,31 @@ class DatabaseService {
     }
 
     /**
+     * Limpia la configuración del grupo (usado al desconectar WhatsApp)
+     */
+    async clearGroupConfiguration() {
+        try {
+            // Eliminar configuración del grupo ID
+            await this.connection.execute(
+                'DELETE FROM condo360ws_config WHERE config_key = ?',
+                ['whatsapp_group_id']
+            );
+            
+            // Eliminar configuración del nombre del grupo
+            await this.connection.execute(
+                'DELETE FROM condo360ws_config WHERE config_key = ?',
+                ['whatsapp_group_name']
+            );
+            
+            logger.info('Configuración del grupo limpiada después de desconexión');
+            return true;
+        } catch (error) {
+            logger.error('Error limpiando configuración del grupo:', error);
+            return false;
+        }
+    }
+
+    /**
      * Cierra la conexión a la base de datos
      */
     async close() {

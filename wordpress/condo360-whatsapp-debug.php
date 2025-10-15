@@ -645,7 +645,7 @@ class Condo360WhatsAppPlugin {
                     },
                     success: function(response) {
                         if (response.success) {
-                            alert('WhatsApp desconectado correctamente. Se generará un nuevo QR.');
+                            alert('✅ WhatsApp desconectado correctamente.\n\nSe generará un nuevo QR y se limpió la configuración del grupo.\n\nDeberás seleccionar el grupo nuevamente después de reconectar.');
                             // Reactivar verificación automática después de desconectar
                             qrLoaded = false;
                             clearInterval(updateInterval);
@@ -654,7 +654,7 @@ class Condo360WhatsAppPlugin {
                             // Mostrar tooltip informativo
                             showDisconnectTooltip();
                         } else {
-                            alert('Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
+                            alert('❌ Error desconectando WhatsApp: ' + (response.data || 'Error desconocido'));
                         }
                     },
                     error: function(xhr, status, error) {
@@ -674,7 +674,8 @@ class Condo360WhatsAppPlugin {
                     '<div class="tooltip-icon">💡</div>' +
                     '<div class="tooltip-text">' +
                     '<strong>Consejo:</strong><br>' +
-                    'Puedes usar el botón "Actualizar Estado" para obtener un nuevo QR más rápido.' +
+                    'Puedes usar el botón "Actualizar Estado" para obtener un nuevo QR más rápido.<br><br>' +
+                    '<strong>Importante:</strong> Deberás seleccionar el grupo nuevamente después de reconectar.' +
                     '</div>' +
                     '<button type="button" class="tooltip-close" onclick="$(this).parent().parent().fadeOut()">×</button>' +
                     '</div>' +

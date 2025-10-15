@@ -17,8 +17,8 @@ class Condo360WhatsAppService {
     constructor() {
         this.app = express();
         this.port = process.env.PORT || 3003;
-        this.whatsappService = new WhatsAppService();
         this.databaseService = new DatabaseService();
+        this.whatsappService = new WhatsAppService(this.databaseService);
         
         this.setupMiddleware();
         this.setupRoutes();
@@ -270,7 +270,10 @@ class Condo360WhatsAppService {
                 // Desconectar WhatsApp
                 await this.whatsappService.destroy();
                 
-                logger.info('WhatsApp desconectado manualmente');
+                // Limpiar configuración del grupo para forzar nueva selección
+                await this.databaseService.clearGroupConfiguration();
+                
+                logger.info('WhatsApp desconectado manualmente y configuración del grupo limpiada');
                 
                 // Reinicializar para generar nuevo QR
                 setTimeout(async () => {
@@ -286,7 +289,7 @@ class Condo360WhatsAppService {
                 
                 res.json({
                     success: true,
-                    message: 'WhatsApp desconectado correctamente'
+                    message: 'WhatsApp desconectado correctamente y configuración del grupo limpiada'
                 });
 
             } catch (error) {
