@@ -6,7 +6,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+// const rateLimit = require('express-rate-limit'); // Deshabilitado temporalmente
 require('dotenv').config();
 
 const WhatsAppService = require('./services/whatsappService');
@@ -41,22 +41,22 @@ class Condo360WhatsAppService {
             credentials: true
         }));
 
-        // Rate limiting con configuración para proxy
-        const limiter = rateLimit({
-            windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-            max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-            message: {
-                error: 'Demasiadas solicitudes, intenta más tarde',
-                retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
-            },
-            standardHeaders: true,
-            legacyHeaders: false,
-            // Configurar para funcionar con proxy
-            keyGenerator: (req) => {
-                return req.ip || req.connection.remoteAddress;
-            }
-        });
-        this.app.use('/api/', limiter);
+        // Rate limiting deshabilitado temporalmente para desarrollo
+        // const limiter = rateLimit({
+        //     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
+        //     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+        //     message: {
+        //         error: 'Demasiadas solicitudes, intenta más tarde',
+        //         retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
+        //     },
+        //     standardHeaders: true,
+        //     legacyHeaders: false,
+        //     // Configurar para funcionar con proxy
+        //     keyGenerator: (req) => {
+        //         return req.ip || req.connection.remoteAddress;
+        //     }
+        // });
+        // this.app.use('/api/', limiter);
 
         // Parse JSON
         this.app.use(express.json({ limit: '10mb' }));

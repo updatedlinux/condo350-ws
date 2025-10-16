@@ -267,11 +267,9 @@ class Condo360WhatsAppPlugin {
                         }
                     },
                     error: function(xhr) {
-                        // Si hay error de rate limit, aumentar intervalo
-                        if (xhr.status === 429) {
-                            console.log('Rate limit alcanzado, aumentando intervalo de verificación');
-                            clearInterval(updateInterval);
-                            updateInterval = setInterval(checkAPIStatus, 30000); // 30 segundos
+                        // Rate limiting deshabilitado - solo log de errores generales
+                        if (xhr.status >= 500) {
+                            console.error('Error del servidor:', xhr.status);
                         }
                     }
                 });
