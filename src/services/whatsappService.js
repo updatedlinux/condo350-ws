@@ -17,6 +17,11 @@ class WhatsAppService {
         this.sessionPath = path.join(__dirname, '../../sessions');
         this.groupId = process.env.WHATSAPP_GROUP_ID || '';
         this.databaseService = databaseService; // Referencia al servicio de base de datos
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectInterval = 30000; // 30 segundos
+        this.reconnectTimer = null;
+        this.isReconnecting = false;
         
         // Configurar cliente con autenticación local
         this.setupClient();
@@ -134,15 +139,21 @@ class WhatsAppService {
             this._isConnected = false;
             this.qrCode = null;
             
-            // Limpiar configuración del grupo si hay databaseService disponible
-            if (this.databaseService) {
-                try {
-                    await this.databaseService.clearGroupConfiguration();
-                    logger.info('Configuración del grupo limpiada por desconexión automática');
-                } catch (error) {
-                    logger.error('Error limpiando configuración del grupo:', error);
+            // NO limpiar configuración del grupo automáticamente - mantenerla para reconexión
+            // Solo limpiar si es una desconexión por logout o error crítico
+            if (reason === 'LOGOUT' || reason === 'NAVIGATION') {
+                if (this.databaseService) {
+                    try {
+                        await this.databaseService.clearGroupConfiguration();
+                        logger.info('Configuración del grupo limpiada por logout/navegación');
+                    } catch (error) {
+                        logger.error('Error limpiando configuración del grupo:', error);
+                    }
                 }
             }
+            
+            // Iniciar proceso de reconexión automática
+            this.startReconnectionProcess();
         });
 
         // Error de autenticación
@@ -228,7 +239,32 @@ class WhatsAppService {
      * Verifica si WhatsApp está conectado
      */
     isConnected() {
-        return this._isConnected && this.client && this.client.info;
+        try {
+            // Verificar que el cliente existe y está inicializado
+            if (!this.client) {
+                return false;
+            }
+            
+            // Verificar que el estado interno indica conexión
+            if (!this._isConnected) {
+                return false;
+            }
+            
+            // Verificar que el cliente tiene información válida
+            if (!this.client.info || !this.client.info.wid) {
+                return false;
+            }
+            
+            // Verificar que el cliente no está en proceso de reconexión
+            if (this.isReconnecting) {
+                return false;
+            }
+            
+            return true;
+        } catch (error) {
+            logger.warn('Error verificando estado de conexión:', error.message);
+            return false;
+        }
     }
 
     /**
@@ -395,10 +431,93 @@ class WhatsAppService {
     }
     
     /**
+     * Inicia el proceso de reconexión automática
+     */
+    startReconnectionProcess() {
+        if (this.isReconnecting || this.reconnectAttempts >= this.maxReconnectAttempts) {
+            return;
+        }
+
+        this.isReconnecting = true;
+        this.reconnectAttempts++;
+        
+        logger.info(`🔄 Iniciando reconexión automática (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+        
+        this.reconnectTimer = setTimeout(async () => {
+            try {
+                await this.reconnect();
+            } catch (error) {
+                logger.error('Error en reconexión automática:', error);
+                this.isReconnecting = false;
+                
+                // Si no hemos alcanzado el máximo de intentos, programar otro
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.startReconnectionProcess();
+                } else {
+                    logger.error('❌ Máximo de intentos de reconexión alcanzado. Requiere intervención manual.');
+                }
+            }
+        }, this.reconnectInterval);
+    }
+
+    /**
+     * Intenta reconectar WhatsApp
+     */
+    async reconnect() {
+        try {
+            logger.info('🔄 Intentando reconectar WhatsApp...');
+            
+            // Limpiar cliente anterior si existe
+            if (this.client) {
+                try {
+                    await this.client.destroy();
+                } catch (error) {
+                    logger.warn('Error cerrando cliente anterior:', error.message);
+                }
+            }
+            
+            // Resetear estado
+            this._isConnected = false;
+            this._isQRGenerated = false;
+            this.qrCode = null;
+            this.client = null;
+            
+            // Crear nuevo cliente
+            this.setupClient();
+            await this.initialize();
+            
+            logger.info('✅ Reconexión exitosa');
+            this.isReconnecting = false;
+            this.reconnectAttempts = 0; // Resetear contador en caso de éxito
+            
+        } catch (error) {
+            logger.error('❌ Error en reconexión:', error);
+            this.isReconnecting = false;
+            throw error;
+        }
+    }
+
+    /**
+     * Detiene el proceso de reconexión automática
+     */
+    stopReconnectionProcess() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.isReconnecting = false;
+        this.reconnectAttempts = 0;
+        logger.info('🛑 Proceso de reconexión automática detenido');
+    }
+
+    /**
      * Cierra la conexión de WhatsApp y limpia la sesión
      */
     async destroy() {
         try {
+            // Detener reconexión automática
+            this.stopReconnectionProcess();
+            
             if (this.client) {
                 await this.client.destroy();
                 logger.info('Cliente de WhatsApp cerrado');

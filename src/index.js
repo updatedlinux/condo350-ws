@@ -42,6 +42,8 @@ class Condo360WhatsAppService {
         }));
 
         // Rate limiting deshabilitado temporalmente para desarrollo
+        // Para reactivar en producción, descomentar las siguientes líneas:
+        // const rateLimit = require('express-rate-limit');
         // const limiter = rateLimit({
         //     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
         //     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
@@ -80,7 +82,10 @@ class Condo360WhatsAppService {
                     database: dbHealth,
                     whatsapp: {
                         connected: this.whatsappService.isConnected(),
-                        qrGenerated: this.whatsappService.isQRGenerated
+                        qrGenerated: this.whatsappService.isQRGenerated,
+                        isReconnecting: this.whatsappService.isReconnecting,
+                        reconnectAttempts: this.whatsappService.reconnectAttempts,
+                        maxReconnectAttempts: this.whatsappService.maxReconnectAttempts
                     },
                     configuredGroup: configuredGroup
                 });
@@ -101,7 +106,12 @@ class Condo360WhatsAppService {
                     connected: this.whatsappService.isConnected(),
                     qrGenerated: this.whatsappService.isQRGenerated,
                     groupId: process.env.WHATSAPP_GROUP_ID,
-                    clientInfo: this.whatsappService.getClientInfo()
+                    clientInfo: this.whatsappService.getClientInfo(),
+                    reconnection: {
+                        isReconnecting: this.whatsappService.isReconnecting,
+                        attempts: this.whatsappService.reconnectAttempts,
+                        maxAttempts: this.whatsappService.maxReconnectAttempts
+                    }
                 };
                 res.json({ success: true, data: status });
             } catch (error) {
@@ -338,6 +348,42 @@ class Condo360WhatsAppService {
                 res.status(500).json({
                     success: false,
                     error: 'Error configurando grupo'
+                });
+            }
+        });
+
+        // Forzar reconexión de WhatsApp
+        this.app.post('/api/reconnect', async (req, res) => {
+            try {
+                const { secretKey } = req.body;
+
+                // Validar secret key
+                if (secretKey !== process.env.API_SECRET_KEY) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Clave de API inválida'
+                    });
+                }
+
+                logger.info('🔄 Reconexión manual iniciada...');
+                
+                // Detener reconexión automática si está en curso
+                this.whatsappService.stopReconnectionProcess();
+                
+                // Intentar reconectar
+                await this.whatsappService.reconnect();
+                
+                res.json({
+                    success: true,
+                    message: 'Reconexión iniciada correctamente',
+                    connected: this.whatsappService.isConnected()
+                });
+
+            } catch (error) {
+                logger.error('Error en reconexión manual:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Error iniciando reconexión'
                 });
             }
         });
