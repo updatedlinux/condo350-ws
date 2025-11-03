@@ -22,6 +22,8 @@ class WhatsAppService {
         this.reconnectInterval = 30000; // 30 segundos
         this.reconnectTimer = null;
         this.isReconnecting = false;
+        this.healthCheckInterval = 60000; // 1 minuto
+        this.healthCheckTimer = null;
         
         // Configurar cliente con autenticación local
         this.setupClient();
@@ -121,11 +123,29 @@ class WhatsAppService {
         });
 
         // Cliente listo
-        this.client.on('ready', () => {
+        this.client.on('ready', async () => {
             logger.info('✅ WhatsApp conectado y listo!');
             this._isConnected = true;
             this._isQRGenerated = false;
             this.qrCode = null;
+            this.reconnectAttempts = 0; // Resetear contador de reconexiones
+            
+            // Cargar configuración del grupo desde la base de datos
+            if (this.databaseService) {
+                try {
+                    const configuredGroup = await this.databaseService.getConfiguredGroup();
+                    if (configuredGroup && configuredGroup.groupId) {
+                        this.groupId = configuredGroup.groupId;
+                        process.env.WHATSAPP_GROUP_ID = configuredGroup.groupId;
+                        logger.info(`📋 Configuración del grupo recuperada: ${configuredGroup.groupName || configuredGroup.groupId}`);
+                    }
+                } catch (error) {
+                    logger.error('Error recuperando configuración del grupo:', error);
+                }
+            }
+            
+            // Iniciar health check periódico
+            this.startPeriodicHealthCheck();
         });
 
         // Cliente autenticado
@@ -236,7 +256,7 @@ class WhatsAppService {
     }
 
     /**
-     * Verifica si WhatsApp está conectado
+     * Verifica si WhatsApp está conectado (verificación básica)
      */
     isConnected() {
         try {
@@ -268,6 +288,39 @@ class WhatsAppService {
     }
 
     /**
+     * Verifica si la conexión está realmente activa (prueba real)
+     */
+    async isConnectionActive() {
+        try {
+            // Verificación básica primero
+            if (!this.isConnected()) {
+                return false;
+            }
+
+            // Intentar una operación simple para verificar que la conexión está realmente activa
+            try {
+                // Verificar que el cliente tiene acceso al estado
+                const state = await this.client.getState();
+                if (state !== 'CONNECTED') {
+                    logger.warn(`Estado de conexión no es CONNECTED: ${state}`);
+                    this._isConnected = false;
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                // Si falla la verificación, la conexión está cerrada
+                logger.warn('Conexión inactiva detectada:', error.message);
+                this._isConnected = false;
+                return false;
+            }
+        } catch (error) {
+            logger.warn('Error verificando conexión activa:', error.message);
+            this._isConnected = false;
+            return false;
+        }
+    }
+
+    /**
      * Verifica si el QR está generado
      */
     get isQRGenerated() {
@@ -286,8 +339,15 @@ class WhatsAppService {
      */
     async sendMessage(message, groupId = null) {
         try {
-            if (!this.isConnected()) {
-                throw new Error('WhatsApp no está conectado');
+            // Verificar conexión real antes de enviar
+            const isActive = await this.isConnectionActive();
+            if (!isActive) {
+                // Intentar reconectar si la conexión está inactiva
+                if (!this.isReconnecting) {
+                    logger.warn('Conexión inactiva detectada al enviar mensaje, iniciando reconexión...');
+                    this.startReconnectionProcess();
+                }
+                throw new Error('WhatsApp no está conectado o la conexión está inactiva');
             }
 
             const targetGroupId = groupId || this.groupId;
@@ -312,6 +372,13 @@ class WhatsAppService {
             };
         } catch (error) {
             logger.error('Error enviando mensaje:', error);
+            // Si el error indica conexión cerrada, actualizar estado
+            if (error.message && error.message.includes('closed state')) {
+                this._isConnected = false;
+                if (!this.isReconnecting) {
+                    this.startReconnectionProcess();
+                }
+            }
             throw error;
         }
     }
@@ -321,8 +388,15 @@ class WhatsAppService {
      */
     async getGroups() {
         try {
-            if (!this.isConnected()) {
-                throw new Error('WhatsApp no está conectado');
+            // Verificar conexión real antes de intentar obtener grupos
+            const isActive = await this.isConnectionActive();
+            if (!isActive) {
+                // Intentar reconectar si la conexión está inactiva
+                if (!this.isReconnecting) {
+                    logger.warn('Conexión inactiva detectada, iniciando reconexión...');
+                    this.startReconnectionProcess();
+                }
+                throw new Error('WhatsApp no está conectado o la conexión está inactiva');
             }
 
             const chats = await this.client.getChats();
@@ -350,6 +424,13 @@ class WhatsAppService {
             return groups;
         } catch (error) {
             logger.error('Error obteniendo grupos:', error.message);
+            // Si el error indica conexión cerrada, actualizar estado
+            if (error.message && error.message.includes('closed state')) {
+                this._isConnected = false;
+                if (!this.isReconnecting) {
+                    this.startReconnectionProcess();
+                }
+            }
             throw error;
         }
     }
@@ -467,6 +548,9 @@ class WhatsAppService {
         try {
             logger.info('🔄 Intentando reconectar WhatsApp...');
             
+            // Detener health check mientras se reconecta
+            this.stopPeriodicHealthCheck();
+            
             // Limpiar cliente anterior si existe
             if (this.client) {
                 try {
@@ -490,10 +574,57 @@ class WhatsAppService {
             this.isReconnecting = false;
             this.reconnectAttempts = 0; // Resetear contador en caso de éxito
             
+            // Cargar configuración del grupo desde la base de datos después de reconectar
+            if (this.databaseService) {
+                try {
+                    const configuredGroup = await this.databaseService.getConfiguredGroup();
+                    if (configuredGroup && configuredGroup.groupId) {
+                        this.groupId = configuredGroup.groupId;
+                        process.env.WHATSAPP_GROUP_ID = configuredGroup.groupId;
+                        logger.info(`📋 Configuración del grupo recuperada después de reconexión: ${configuredGroup.groupName || configuredGroup.groupId}`);
+                    }
+                } catch (error) {
+                    logger.error('Error recuperando configuración del grupo después de reconexión:', error);
+                }
+            }
+            
         } catch (error) {
             logger.error('❌ Error en reconexión:', error);
             this.isReconnecting = false;
             throw error;
+        }
+    }
+
+    /**
+     * Inicia el health check periódico de la conexión
+     */
+    startPeriodicHealthCheck() {
+        // Detener cualquier health check anterior
+        this.stopPeriodicHealthCheck();
+        
+        this.healthCheckTimer = setInterval(async () => {
+            try {
+                const isActive = await this.isConnectionActive();
+                if (!isActive && !this.isReconnecting) {
+                    logger.warn('⚠️ Health check: Conexión inactiva detectada, iniciando reconexión...');
+                    this.startReconnectionProcess();
+                }
+            } catch (error) {
+                logger.error('Error en health check periódico:', error);
+            }
+        }, this.healthCheckInterval);
+        
+        logger.info(`🔍 Health check periódico iniciado (cada ${this.healthCheckInterval / 1000} segundos)`);
+    }
+
+    /**
+     * Detiene el health check periódico
+     */
+    stopPeriodicHealthCheck() {
+        if (this.healthCheckTimer) {
+            clearInterval(this.healthCheckTimer);
+            this.healthCheckTimer = null;
+            logger.info('🛑 Health check periódico detenido');
         }
     }
 
@@ -515,8 +646,9 @@ class WhatsAppService {
      */
     async destroy() {
         try {
-            // Detener reconexión automática
+            // Detener reconexión automática y health check
             this.stopReconnectionProcess();
+            this.stopPeriodicHealthCheck();
             
             if (this.client) {
                 await this.client.destroy();

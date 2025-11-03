@@ -172,11 +172,18 @@ class Condo360WhatsAppService {
                     });
                 }
 
-                // Verificar conexión
-                if (!this.whatsappService.isConnected()) {
+                // Verificar conexión real (no solo el flag)
+                const isActive = await this.whatsappService.isConnectionActive();
+                if (!isActive) {
+                    // Si no está activa pero el flag dice que está conectado, iniciar reconexión
+                    if (this.whatsappService.isConnected() && !this.whatsappService.isReconnecting) {
+                        logger.warn('Conexión inactiva detectada en /api/send-message, iniciando reconexión...');
+                        this.whatsappService.startReconnectionProcess();
+                    }
                     return res.status(503).json({
                         success: false,
-                        error: 'WhatsApp no está conectado. Escanea el QR primero.'
+                        error: 'WhatsApp no está conectado o la conexión está inactiva. Escanea el QR o espera a la reconexión automática.',
+                        reconnecting: this.whatsappService.isReconnecting
                     });
                 }
 
@@ -221,11 +228,18 @@ class Condo360WhatsAppService {
         // Obtener grupos disponibles
         this.app.get('/api/groups', async (req, res) => {
             try {
-                // Verificar conexión
-                if (!this.whatsappService.isConnected()) {
+                // Verificar conexión real (no solo el flag)
+                const isActive = await this.whatsappService.isConnectionActive();
+                if (!isActive) {
+                    // Si no está activa pero el flag dice que está conectado, iniciar reconexión
+                    if (this.whatsappService.isConnected() && !this.whatsappService.isReconnecting) {
+                        logger.warn('Conexión inactiva detectada en /api/groups, iniciando reconexión...');
+                        this.whatsappService.startReconnectionProcess();
+                    }
                     return res.status(503).json({
                         success: false,
-                        error: 'WhatsApp no está conectado. Escanea el QR primero.'
+                        error: 'WhatsApp no está conectado o la conexión está inactiva. Escanea el QR o espera a la reconexión automática.',
+                        reconnecting: this.whatsappService.isReconnecting
                     });
                 }
 
@@ -239,9 +253,20 @@ class Condo360WhatsAppService {
 
             } catch (error) {
                 logger.error('Error obteniendo grupos:', error);
+                
+                // Si el error indica conexión cerrada, proporcionar más información
+                if (error.message && error.message.includes('closed state')) {
+                    return res.status(503).json({
+                        success: false,
+                        error: 'La conexión de WhatsApp está cerrada. Se está intentando reconectar automáticamente.',
+                        reconnecting: this.whatsappService.isReconnecting
+                    });
+                }
+                
                 res.status(500).json({
                     success: false,
-                    error: 'Error obteniendo grupos'
+                    error: 'Error obteniendo grupos',
+                    details: error.message
                 });
             }
         });
@@ -330,11 +355,31 @@ class Condo360WhatsAppService {
                     });
                 }
 
+                // Verificar conexión antes de configurar (pero no bloquear si está reconectando)
+                if (!this.whatsappService.isReconnecting) {
+                    const isActive = await this.whatsappService.isConnectionActive();
+                    if (!isActive) {
+                        // Iniciar reconexión si está inactiva
+                        if (this.whatsappService.isConnected()) {
+                            logger.warn('Conexión inactiva detectada en /api/set-group, iniciando reconexión...');
+                            this.whatsappService.startReconnectionProcess();
+                        }
+                        return res.status(503).json({
+                            success: false,
+                            error: 'WhatsApp no está conectado o la conexión está inactiva. Espera a que se reconecte automáticamente.',
+                            reconnecting: this.whatsappService.isReconnecting
+                        });
+                    }
+                }
+
                 // Guardar en base de datos (ID y nombre)
                 await this.databaseService.setGroupId(groupId, groupName);
                 
-                // Actualizar variable de entorno
+                // Actualizar variable de entorno y referencia en el servicio
                 process.env.WHATSAPP_GROUP_ID = groupId;
+                this.whatsappService.groupId = groupId;
+
+                logger.info(`✅ Grupo configurado: ${groupName || groupId}`);
 
                 res.json({
                     success: true,
@@ -345,9 +390,20 @@ class Condo360WhatsAppService {
 
             } catch (error) {
                 logger.error('Error configurando grupo:', error);
+                
+                // Si el error indica conexión cerrada, proporcionar más información
+                if (error.message && error.message.includes('closed state')) {
+                    return res.status(503).json({
+                        success: false,
+                        error: 'La conexión de WhatsApp está cerrada. Se está intentando reconectar automáticamente. Intenta de nuevo en unos momentos.',
+                        reconnecting: this.whatsappService.isReconnecting
+                    });
+                }
+                
                 res.status(500).json({
                     success: false,
-                    error: 'Error configurando grupo'
+                    error: 'Error configurando grupo',
+                    details: error.message
                 });
             }
         });
@@ -419,10 +475,19 @@ class Condo360WhatsAppService {
             // Inicializar base de datos
             await this.databaseService.initialize();
             
-            // Cargar configuración de grupo
-            const groupId = await this.databaseService.getGroupId();
-            if (groupId) {
-                process.env.WHATSAPP_GROUP_ID = groupId;
+            // Cargar configuración de grupo desde la base de datos
+            const configuredGroup = await this.databaseService.getConfiguredGroup();
+            if (configuredGroup && configuredGroup.groupId) {
+                process.env.WHATSAPP_GROUP_ID = configuredGroup.groupId;
+                this.whatsappService.groupId = configuredGroup.groupId;
+                logger.info(`📋 Configuración del grupo cargada al iniciar: ${configuredGroup.groupName || configuredGroup.groupId}`);
+            } else {
+                // Fallback al método anterior por compatibilidad
+                const groupId = await this.databaseService.getGroupId();
+                if (groupId) {
+                    process.env.WHATSAPP_GROUP_ID = groupId;
+                    this.whatsappService.groupId = groupId;
+                }
             }
 
             // Inicializar WhatsApp
