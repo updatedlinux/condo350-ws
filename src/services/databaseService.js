@@ -140,26 +140,79 @@ class DatabaseService {
 
     /**
      * Configura el ID del grupo de WhatsApp
+     * Este método es crítico para la persistencia - debe ser muy robusto
      */
     async setGroupId(groupId, groupName = null) {
         try {
-            await this.connection.execute(
-                'INSERT INTO condo360ws_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = CURRENT_TIMESTAMP',
-                ['whatsapp_group_id', groupId, groupId]
-            );
+            // Verificar que la conexión esté activa
+            if (!this.connection) {
+                throw new Error('No hay conexión a la base de datos disponible');
+            }
+
+            // Guardar el ID del grupo (múltiples intentos si falla)
+            let attempts = 0;
+            const maxAttempts = 3;
+            while (attempts < maxAttempts) {
+                try {
+                    await this.connection.execute(
+                        'INSERT INTO condo360ws_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = CURRENT_TIMESTAMP',
+                        ['whatsapp_group_id', groupId, groupId]
+                    );
+                    break; // Éxito, salir del loop
+                } catch (error) {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        logger.error(`Error configurando grupo ID después de ${maxAttempts} intentos:`, error.message);
+                        throw error;
+                    }
+                    logger.warn(`Intento ${attempts} falló, reintentando...`);
+                    await new Promise(resolve => setTimeout(resolve, 100)); // Esperar 100ms antes de reintentar
+                }
+            }
 
             // Si se proporciona el nombre del grupo, también guardarlo
             if (groupName) {
-                await this.connection.execute(
-                    'INSERT INTO condo360ws_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = CURRENT_TIMESTAMP',
-                    ['whatsapp_group_name', groupName, groupName]
-                );
+                attempts = 0;
+                while (attempts < maxAttempts) {
+                    try {
+                        await this.connection.execute(
+                            'INSERT INTO condo360ws_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value = ?, updated_at = CURRENT_TIMESTAMP',
+                            ['whatsapp_group_name', groupName, groupName]
+                        );
+                        break; // Éxito, salir del loop
+                    } catch (error) {
+                        attempts++;
+                        if (attempts >= maxAttempts) {
+                            logger.warn(`No se pudo guardar nombre del grupo después de ${maxAttempts} intentos:`, error.message);
+                            // No lanzar error aquí, el ID ya está guardado
+                        } else {
+                            logger.warn(`Intento ${attempts} falló para nombre, reintentando...`);
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    }
+                }
             }
 
-            logger.info(`Grupo ID configurado: ${groupId}${groupName ? ` (${groupName})` : ''}`);
+            logger.info(`✅ Grupo ID configurado exitosamente: ${groupId}${groupName ? ` (${groupName})` : ''}`);
+            
+            // Verificar que se guardó correctamente leyéndolo de vuelta
+            try {
+                const [verifyRows] = await this.connection.execute(
+                    'SELECT config_value FROM condo360ws_config WHERE config_key = ?',
+                    ['whatsapp_group_id']
+                );
+                if (verifyRows.length > 0 && verifyRows[0].config_value === groupId) {
+                    logger.info('✅ Verificación: Grupo guardado correctamente en BD');
+                } else {
+                    logger.warn('⚠️ Verificación: El grupo guardado no coincide con el esperado');
+                }
+            } catch (verifyError) {
+                logger.warn('No se pudo verificar el grupo guardado:', verifyError.message);
+            }
+
             return true;
         } catch (error) {
-            logger.error('Error configurando grupo ID:', error);
+            logger.error('Error crítico configurando grupo ID:', error);
             throw error;
         }
     }
@@ -296,60 +349,88 @@ class DatabaseService {
 
     /**
      * Obtiene el grupo configurado desde la base de datos de WordPress
+     * Este método es completamente independiente de WhatsApp y solo lee de la BD
      */
     async getConfiguredGroup() {
         try {
-            // Buscar en la tabla de configuración de WordPress
-            const [rows] = await this.connection.execute(
-                'SELECT config_value, updated_at FROM condo360ws_config WHERE config_key = ?',
-                ['whatsapp_group_id']
-            );
+            // Verificar que la conexión esté activa
+            if (!this.connection) {
+                logger.warn('No hay conexión a la base de datos disponible');
+                return null;
+            }
 
-            if (rows.length > 0) {
+            // Buscar en la tabla de configuración de WordPress
+            let rows = [];
+            try {
+                [rows] = await this.connection.execute(
+                    'SELECT config_value, updated_at FROM condo360ws_config WHERE config_key = ?',
+                    ['whatsapp_group_id']
+                );
+            } catch (queryError) {
+                // Si la tabla no existe o hay error, intentar con consulta más simple
+                logger.warn('Error en consulta principal, intentando método alternativo:', queryError.message);
+                try {
+                    const groupId = await this.getGroupId();
+                    if (groupId) {
+                        return {
+                            groupId: groupId,
+                            groupName: await this.getConfig('whatsapp_group_name') || null,
+                            configuredAt: null
+                        };
+                    }
+                } catch (altError) {
+                    logger.error('Error en método alternativo:', altError.message);
+                }
+                return null;
+            }
+
+            if (rows.length > 0 && rows[0].config_value) {
                 const groupId = rows[0].config_value;
                 const configuredAt = rows[0].updated_at;
                 
                 // Intentar obtener el nombre del grupo desde la tabla de configuración
+                let groupName = null;
                 try {
                     const [nameRows] = await this.connection.execute(
                         'SELECT config_value FROM condo360ws_config WHERE config_key = ?',
                         ['whatsapp_group_name']
                     );
                     
-                    let groupName = 'Grupo desconocido';
                     if (nameRows.length > 0 && nameRows[0].config_value) {
                         groupName = nameRows[0].config_value;
-                    } else {
-                        // Fallback: buscar en logs de mensajes
+                    }
+                } catch (nameError) {
+                    logger.warn('No se pudo obtener nombre del grupo desde config:', nameError.message);
+                }
+
+                // Si no hay nombre, intentar buscar en logs de mensajes como fallback
+                if (!groupName) {
+                    try {
                         const [messageRows] = await this.connection.execute(
-                            'SELECT group_name FROM condo360ws_messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1',
+                            'SELECT group_name FROM condo360ws_messages WHERE group_id = ? AND group_name IS NOT NULL ORDER BY created_at DESC LIMIT 1',
                             [groupId]
                         );
                         
                         if (messageRows.length > 0 && messageRows[0].group_name) {
                             groupName = messageRows[0].group_name;
                         }
+                    } catch (messageError) {
+                        logger.warn('No se pudo obtener nombre del grupo desde mensajes:', messageError.message);
                     }
-                    
-                    return {
-                        groupId,
-                        groupName,
-                        configuredAt
-                    };
-                } catch (nameError) {
-                    // Si no se puede obtener el nombre, usar solo el ID
-                    logger.warn('No se pudo obtener nombre del grupo:', nameError.message);
-                    return {
-                        groupId,
-                        groupName: 'Grupo desconocido',
-                        configuredAt
-                    };
                 }
+                
+                return {
+                    groupId,
+                    groupName: groupName || null,
+                    configuredAt
+                };
             }
 
             return null;
         } catch (error) {
-            logger.error('Error obteniendo grupo configurado:', error);
+            // Log del error pero no lanzarlo - devolver null en su lugar
+            logger.error('Error obteniendo grupo configurado:', error.message);
+            // No incluir el stack trace completo para evitar logs muy largos
             return null;
         }
     }
